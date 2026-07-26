@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { Models } from "appwrite";
 import { account } from "../lib/appwrite";
 
-import { fetchInventario, fetchVentas, createVenta, deleteVenta, fetchClientes, createCliente, deleteCliente, fetchGastos, createGasto, deleteGasto, createCierreCaja, fetchMovimientos, clearAllMovimientos, fetchRecargas, createRecarga, deleteRecarga, recepcionarRecarga, updateInventoryStock, fetchUserProfile, InventoryItem, SaleItem, ClientItem, GastoItem, MovementItem, RecargaItem } from "../lib/db";
+import { fetchInventario, fetchVentas, createVenta, deleteVenta, fetchClientes, createCliente, deleteCliente, fetchGastos, createGasto, deleteGasto, createCierreCaja, fetchMovimientos, clearAllMovimientos, fetchRecargas, createRecarga, deleteRecarga, recepcionarRecarga, updateInventoryStock, fetchUserProfile, fetchGalonesHoy, saveGalonesHoy, InventoryItem, SaleItem, ClientItem, GastoItem, MovementItem, RecargaItem } from "../lib/db";
 import { exportToCSV, printPDFReport } from "../lib/export";
 
 type View = "Resumen" | "Inventario" | "Ventas" | "Recargas" | "Movimientos" | "Clientes" | "Caja" | "Reportes";
@@ -169,6 +169,8 @@ export default function Home() {
   const [movimientosList, setMovimientosList] = useState<MovementItem[]>([]);
   const [recargasList, setRecargasList] = useState<RecargaItem[]>([]);
   const [loadingData, setLoadingData] = useState(false);
+  const [galonesChofer, setGalonesChofer] = useState<string | number>("");
+  const [savingGalones, setSavingGalones] = useState(false);
 
   // New Sale Form State
   const [saleClient, setSaleClient] = useState("");
@@ -235,13 +237,14 @@ export default function Home() {
     setLoadingData(true);
     try {
       await clearAllMovimientos().catch(() => {});
-      const [invData, salesData, cliData, gasData, movData, recData] = await Promise.all([
+      const [invData, salesData, cliData, gasData, movData, recData, galonesData] = await Promise.all([
         fetchInventario(),
         fetchVentas(),
         fetchClientes(),
         fetchGastos(),
         fetchMovimientos(),
         fetchRecargas(),
+        fetchGalonesHoy(),
       ]);
       setInventory(invData);
       setSalesList(salesData);
@@ -249,6 +252,7 @@ export default function Home() {
       setGastosList(gasData);
       setMovimientosList(movData);
       setRecargasList(recData);
+      setGalonesChofer(galonesData || "");
     } catch (err) {
       console.error("Error loading Appwrite content:", err);
     } finally {
@@ -398,11 +402,24 @@ export default function Home() {
   }
 
   async function handleAdjustStock(tipo_balon: string, estado: string, delta: number) {
+    const currentItem = inventory.find((item) => item.tipo_balon === tipo_balon && item.estado === estado);
+    if (!currentItem || currentItem.cantidad + delta < 0) return;
+
+    const previousInventory = inventory;
+    setInventory((items) =>
+      items.map((item) =>
+        item.tipo_balon === tipo_balon && item.estado === estado
+          ? { ...item, cantidad: item.cantidad + delta }
+          : item
+      )
+    );
+
     try {
       await updateInventoryStock(tipo_balon, estado, delta, true);
-      await loadAppwriteContent();
+      setInventory(await fetchInventario());
     } catch (err) {
       console.error("Error updating stock:", err);
+      setInventory(previousInventory);
     }
   }
 
@@ -516,7 +533,7 @@ export default function Home() {
         </section>
 
         <section className="panel sales-panel"><div className="panel-head"><div><h3>Últimas ventas</h3></div><button onClick={() => setView("Ventas")}>Ver todas</button></div><SalesTable sales={salesList} onRequestDelete={handleRequestDelete} /></section>
-      </div> : <ModuleView view={view} onAdd={() => setModal(true)} onAddGasto={() => setGastoModal(true)} onCierreCaja={() => setCierreModal(true)} onAddCliente={() => setClienteModal(true)} onAddRecarga={() => setRecargaModal(true)} onRecepcionar={handleRecepcionar} sales={salesList} inventory={inventory} clients={clientsList} gastos={gastosList} movimientos={movimientosList} recargas={recargasList} onAdjust={handleAdjustStock} onRequestDelete={handleRequestDelete} />}
+      </div> : <ModuleView view={view} onAdd={() => setModal(true)} onAddGasto={() => setGastoModal(true)} onCierreCaja={() => setCierreModal(true)} onAddCliente={() => setClienteModal(true)} onAddRecarga={() => setRecargaModal(true)} onRecepcionar={handleRecepcionar} sales={salesList} inventory={inventory} clients={clientsList} gastos={gastosList} movimientos={movimientosList} recargas={recargasList} onAdjust={handleAdjustStock} onRequestDelete={handleRequestDelete} galonesChofer={galonesChofer} setGalonesChofer={setGalonesChofer} savingGalones={savingGalones} setSavingGalones={setSavingGalones} saveGalonesHoy={saveGalonesHoy} />}
     </section>
 
     {modal && <div className="modal-backdrop" onMouseDown={() => setModal(false)}><section className="modal" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setModal(false)}>×</button><span className="eyebrow">NUEVA OPERACIÓN</span><h2>Registrar venta</h2><form onSubmit={handleSaveSale}><div className="form-grid"><label>Nombre del cliente{clientsList.length > 0 ? <select value={saleClient} onChange={(e)=>setSaleClient(e.target.value)}><option value="">-- Seleccionar o escribir cliente --</option>{clientsList.map(c => <option key={c.nombre} value={c.nombre}>{c.nombre} ({c.tipo_cliente})</option>)}</select> : null}<input type="text" placeholder="Escribir nombre de cliente" value={saleClient} onChange={(e)=>setSaleClient(e.target.value)} required /></label><label>Tipo de cliente<select value={saleClientType} onChange={(e)=>setSaleClientType(e.target.value)}><option value="Restaurante">Restaurante</option><option value="Negocio">Negocio</option><option value="Domicilio">Domicilio</option></select></label><label>Tipo de balón<select value={saleType} onChange={(e)=>{ setSaleType(e.target.value); setSalePrice(e.target.value === "Premium" ? 55 : 52); }}><option value="Normal">Normal</option><option value="Premium">Premium</option></select></label><label>Cantidad<input type="number" value={saleQty} onChange={(e)=>setSaleQty(Number(e.target.value))} min="1" required /></label><label>Precio unitario (S/)<input type="number" value={salePrice} onChange={(e)=>setSalePrice(Number(e.target.value))} step="0.5" required /></label><label>Forma de pago<select value={salePayment} onChange={(e)=>setSalePayment(e.target.value)}><option value="Efectivo">Efectivo</option><option value="Yape">Yape / Plin</option><option value="Transferencia">Transferencia</option><option value="Crédito">Crédito</option></select></label><label>Estado de entrega<select value={saleEstado} onChange={(e)=>setSaleEstado(e.target.value)}><option value="confirmada">Completo (Entregado y cobrado)</option><option value="debe_pago">Debe pagar</option><option value="debe_balon">Debe balón</option><option value="debe_ambos">Debe ambos</option></select></label><label>Vacíos recibidos<input type="number" value={saleVacios} onChange={(e)=>setSaleVacios(Number(e.target.value))} min="0" required /></label></div><div className="sale-total"><span>Total de la venta</span><strong>S/ {(saleQty * salePrice).toFixed(2)}</strong></div><div className="modal-actions"><button type="button" onClick={()=>setModal(false)}>Cancelar</button><button type="submit" className="primary" disabled={savingSale}>{savingSale ? "Guardando…" : "Guardar venta"}</button></div></form></section></div>}
@@ -533,7 +550,30 @@ export default function Home() {
   </main>;
 }
 
-function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAddRecarga, onRecepcionar, sales, inventory, clients, gastos, movimientos, recargas, onAdjust, onRequestDelete }: { view: View; onAdd: () => void; onAddGasto: () => void; onCierreCaja: () => void; onAddCliente: () => void; onAddRecarga: () => void; onRecepcionar: (id: string, tipo: string, qty: number) => void; sales: SaleItem[]; inventory: InventoryItem[]; clients: ClientItem[]; gastos: GastoItem[]; movimientos: MovementItem[]; recargas: RecargaItem[]; onAdjust: (tipo: string, estado: string, delta: number) => void; onRequestDelete?: (type: "venta" | "cliente" | "gasto" | "recarga", id: string, label: string) => void }) {
+interface ModuleViewProps {
+  view: View;
+  onAdd: () => void;
+  onAddGasto: () => void;
+  onCierreCaja: () => void;
+  onAddCliente: () => void;
+  onAddRecarga: () => void;
+  onRecepcionar: (id: string, tipo: string, qty: number) => void;
+  sales: SaleItem[];
+  inventory: InventoryItem[];
+  clients: ClientItem[];
+  gastos: GastoItem[];
+  movimientos: MovementItem[];
+  recargas: RecargaItem[];
+  onAdjust: (tipo: string, estado: string, delta: number) => void;
+  onRequestDelete?: (type: "venta" | "cliente" | "gasto" | "recarga", id: string, label: string) => void;
+  galonesChofer: string | number;
+  setGalonesChofer: React.Dispatch<React.SetStateAction<string | number>>;
+  savingGalones: boolean;
+  setSavingGalones: React.Dispatch<React.SetStateAction<boolean>>;
+  saveGalonesHoy: (galones: number) => Promise<void>;
+}
+
+function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAddRecarga, onRecepcionar, sales, inventory, clients, gastos, movimientos, recargas, onAdjust, onRequestDelete, galonesChofer, setGalonesChofer, savingGalones, setSavingGalones, saveGalonesHoy }: ModuleViewProps) {
   const copy: Record<View, [string,string]> = {
     Resumen: ["", ""],
     Inventario: ["Control de existencias", ""],
@@ -668,26 +708,46 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
     </section>
 
     {view === "Inventario" ? (
-      <div className="caja-summary-grid" style={{marginBottom: '20px'}}>
-        <div className="caja-card">
-          <span>Balones Llenos (Disponibles)</span>
-          <strong style={{color: 'var(--color-success)'}}>
-            {inventory.filter(i => i.estado === "lleno").reduce((a, b) => a + b.cantidad, 0)} unidades
-          </strong>
+      <>
+        <section className="galones-section" style={{margin:'0 0 16px',padding:'16px 20px',background:'#fff',border:'1px solid #e2e8f0',borderRadius:'12px'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'16px',flexWrap:'wrap'}}>
+            <div>
+              <h3 style={{margin:0,fontSize:'15px',fontWeight:700,color:'#0f172a'}}>Galones del chofer</h3>
+              <p style={{margin:'4px 0 0',fontSize:'13px',color:'#64748b'}}>Cantidad de galones que lleva el chofer en el carro hoy. El valor se actualiza en tiempo real en la app del chofer.</p>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+              <input type="text" value={galonesChofer} onChange={(e) => {
+                const val = e.target.value;
+                if (val === "" || /^\d+$/.test(val)) {
+                  setGalonesChofer(val);
+                }
+              }} style={{width:'90px',padding:'10px 14px',border:'1px solid #cbd5e1',borderRadius:'8px',fontSize:'18px',fontWeight:700,textAlign:'center',color:'#0f172a'}} placeholder="0" />
+              <button disabled={savingGalones} onClick={async () => { setSavingGalones(true); try { await saveGalonesHoy(Number(galonesChofer || 0)); } catch(err) { console.error('Error guardando galones:', err); } finally { setSavingGalones(false); } }} style={{padding:'10px 20px',background:'#0f172a',color:'#fff',border:'none',borderRadius:'8px',fontWeight:600,fontSize:'14px',cursor:'pointer'}}>{savingGalones ? 'Guardando...' : 'Guardar galones'}</button>
+            </div>
+          </div>
+        </section>
+
+        <div className="caja-summary-grid" style={{marginBottom: '20px'}}>
+          <div className="caja-card">
+            <span>Balones Llenos (Disponibles)</span>
+            <strong style={{color: 'var(--color-success)'}}>
+              {inventory.filter(i => i.estado === "lleno").reduce((a, b) => a + b.cantidad, 0)} unidades
+            </strong>
+          </div>
+          <div className="caja-card">
+            <span>Balones Vacíos (Almacén)</span>
+            <strong style={{color: 'var(--color-warning)'}}>
+              {inventory.filter(i => i.estado === "vac\u00edo").reduce((a, b) => a + b.cantidad, 0)} unidades
+            </strong>
+          </div>
+          <div className="caja-card highlight">
+            <span>Valor Cargas Llenas (S/ 44.30)</span>
+            <strong>
+              S/ {(inventory.filter(i => i.estado === "lleno").reduce((a, b) => a + b.cantidad, 0) * 44.30).toFixed(2)}
+            </strong>
+          </div>
         </div>
-        <div className="caja-card">
-          <span>Balones Vacíos (Almacén)</span>
-          <strong style={{color: 'var(--color-warning)'}}>
-            {inventory.filter(i => i.estado === "vac\u00edo").reduce((a, b) => a + b.cantidad, 0)} unidades
-          </strong>
-        </div>
-        <div className="caja-card highlight">
-          <span>Valor Cargas Llenas (S/ 44.30)</span>
-          <strong>
-            S/ {(inventory.filter(i => i.estado === "lleno").reduce((a, b) => a + b.cantidad, 0) * 44.30).toFixed(2)}
-          </strong>
-        </div>
-      </div>
+      </>
     ) : (
       <div className="module-cards" style={{gridTemplateColumns: 'minmax(0, 320px)'}}>
         <div><span>Total registrado</span><strong>{view === "Ventas" ? `S/ ${totalVentas.toFixed(2)}` : view === "Recargas" ? `${recargas.filter(r => r.estado !== "recibida").reduce((a, b) => a + (b.cantidad_enviada || 0), 0)} balones en planta` : view === "Movimientos" ? `${movimientos.length} movimientos` : view === "Clientes" ? `${clients.length} clientes` : view === "Caja" ? `S/ ${totalEfectivo.toFixed(2)}` : view === "Reportes" ? `${sales.length} ventas procesadas` : `${inventory.reduce((a,b)=>a+b.cantidad,0)} balones`}</strong></div>

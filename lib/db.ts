@@ -546,3 +546,45 @@ export async function fetchUserProfile(user: { $id: string; email: string; name?
     role: isLuz ? "Dueña" : "Administrador",
   };
 }
+
+// ── Carga diaria (Galones del chofer) ────────────────────────────────────────
+export async function fetchGalonesHoy(): Promise<number> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const res = await tablesDB.listRows({
+      databaseId: DATABASE_ID,
+      tableId: "carga_diaria",
+      queries: [Query.equal("fecha", today), Query.limit(1)]
+    });
+    if (res.rows.length > 0) {
+      return res.rows[0].galones || 0;
+    }
+    return 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function saveGalonesHoy(galones: number): Promise<void> {
+  const today = new Date().toISOString().split('T')[0];
+  const res = await tablesDB.listRows({
+    databaseId: DATABASE_ID,
+    tableId: "carga_diaria",
+    queries: [Query.equal("fecha", today), Query.limit(1)]
+  });
+  if (res.rows.length > 0) {
+    await tablesDB.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: "carga_diaria",
+      rowId: res.rows[0].$id,
+      data: { galones, actualizado_en: new Date().toISOString() }
+    });
+  } else {
+    await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: "carga_diaria",
+      rowId: ID.unique(),
+      data: { fecha: today, galones, actualizado_en: new Date().toISOString() }
+    });
+  }
+}
