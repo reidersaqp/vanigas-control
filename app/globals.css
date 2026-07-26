@@ -1563,8 +1563,55 @@ tr:hover td {
   }
   .login-page {
     grid-template-columns: minmax(0, 1fr);
+    min-height: 100svh;
   }
   .login-brand-panel {
     display: none;
+  }
+  .login-form-panel {
+    align-items: center;
+    justify-items: center;
+    min-height: 100svh;
+    padding: clamp(1rem, 5vw, 2rem);
+  }
+  .login-card {
+    width: min(100%, 420px);
+    padding: clamp(1.5rem, 7vw, 2.5rem);
+    border-radius: clamp(1rem, 5vw, var(--radius-lg));
+  }
+  .login-card h2 {
+    font-size: clamp(1.9rem, 9vw, var(--text-2xl));
+    margin-bottom: var(--space-lg);
+  }
+  .login-card label {
+    font-size: clamp(0.85rem, 3.8vw, var(--text-xs));
+  }
+  .login-input,
+  .login-submit {
+    min-height: 3.2rem;
+  }
+  .login-input input {
+    font-size: 1rem;
+    padding-left: var(--space-xs);
+  }
+  .login-input button {
+    min-width: 3.25rem;
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-page {
+    background:
+      radial-gradient(circle at top right, oklch(95% 0.025 220), transparent 45%),
+      var(--color-paper-2);
+  }
+  .login-form-panel {
+    padding: 1rem;
+  }
+  .login-card {
+    width: 100%;
+    padding: 1.5rem;
+    box-shadow: 0 18px 42px oklch(20% 0.04 245 / 12%);
   }
 }
