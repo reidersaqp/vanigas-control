@@ -60,6 +60,28 @@ function SalesTable({ sales, onRequestDelete }: { sales: SaleItem[]; onRequestDe
   </table></div>;
 }
 
+function getLoginErrorMessage(error: unknown) {
+  const details = error as { message?: string; type?: string; code?: number };
+
+  if (details.type === "user_invalid_credentials") {
+    return "El correo o la contraseña no son correctos.";
+  }
+
+  if (details.type === "user_email_not_verified") {
+    return "La cuenta existe, pero falta verificarla en Appwrite.";
+  }
+
+  if (details.type === "user_blocked") {
+    return "La cuenta está bloqueada en Appwrite.";
+  }
+
+  if (details.code === 0 || details.message?.toLowerCase().includes("failed to fetch")) {
+    return "Appwrite está bloqueando la conexión. Revisa que el dominio de Vercel esté agregado en Platforms.";
+  }
+
+  return details.message || "No se pudo iniciar sesión. Revisa la configuración de Appwrite.";
+}
+
 function LoginScreen({ onLogin }: { onLogin: (user: Models.User<Models.Preferences>) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -74,8 +96,10 @@ function LoginScreen({ onLogin }: { onLogin: (user: Models.User<Models.Preferenc
     try {
       await account.createEmailPasswordSession({ email: email.trim(), password });
       onLogin(await account.get());
-    } catch {
-      setError("El correo o la contraseña no son correctos.");
+    } catch (err) {
+      console.error("Error de inicio de sesión:", err);
+      setError(getLoginErrorMessage(err));
+      return;
     } finally {
       setSubmitting(false);
     }
