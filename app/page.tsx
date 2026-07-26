@@ -205,7 +205,7 @@ export default function Home() {
       .then(async (user) => {
         setCurrentUser(user);
         const profile = await fetchUserProfile(user);
-        setUserProfile(profile);
+        setUserProfile(profile as typeof userProfile);
         loadAppwriteContent();
       })
       .catch(() => setCurrentUser(null))
@@ -412,7 +412,7 @@ export default function Home() {
   }
 
   if (checkingSession) return <main className="session-loading"><div className="session-spinner" /><b>VANIGAS</b><span>Verificando acceso…</span></main>;
-  if (!currentUser) return <LoginScreen onLogin={async (user) => { setCurrentUser(user); const p = await fetchUserProfile(user); setUserProfile(p); loadAppwriteContent(); }} />;
+  if (!currentUser) return <LoginScreen onLogin={async (user) => { setCurrentUser(user); const p = await fetchUserProfile(user); setUserProfile(p as typeof userProfile); loadAppwriteContent(); }} />;
 
   const userName = userProfile.name;
   const visibleMenu = menu;
@@ -496,7 +496,7 @@ export default function Home() {
           </article>
         </section>
 
-        <section className="panel sales-panel"><div className="panel-head"><div><h3>Últimas ventas</h3></div><button onClick={() => setView("Ventas")}>Ver todas</button></div><SalesTable sales={salesList} onDelete={handleDeleteVenta} onRequestDelete={handleRequestDelete} /></section>
+        <section className="panel sales-panel"><div className="panel-head"><div><h3>Últimas ventas</h3></div><button onClick={() => setView("Ventas")}>Ver todas</button></div><SalesTable sales={salesList} onRequestDelete={handleRequestDelete} /></section>
       </div> : <ModuleView view={view} onAdd={() => setModal(true)} onAddGasto={() => setGastoModal(true)} onCierreCaja={() => setCierreModal(true)} onAddCliente={() => setClienteModal(true)} onAddRecarga={() => setRecargaModal(true)} onRecepcionar={handleRecepcionar} sales={salesList} inventory={inventory} clients={clientsList} gastos={gastosList} movimientos={movimientosList} recargas={recargasList} onAdjust={handleAdjustStock} onRequestDelete={handleRequestDelete} />}
     </section>
 
