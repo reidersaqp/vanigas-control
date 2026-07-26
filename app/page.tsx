@@ -98,11 +98,6 @@ function LoginScreen({ onLogin }: { onLogin: (user: Models.User<Models.Preferenc
 
     <section className="login-form-panel">
       <div className="login-card">
-        <div className="login-mobile-brand">
-          <img src="/logo_vanigas.png" alt="" />
-          <b>VANIGAS</b>
-        </div>
-        <span className="login-eyebrow">ACCESO AL SISTEMA</span>
         <h2>Iniciar sesión</h2>
         <form onSubmit={handleSubmit}>
           <label>Correo electrónico
