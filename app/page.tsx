@@ -520,8 +520,51 @@ export default function Home() {
 
         <section className="dashboard-grid lower">
           <article className="panel chart-panel">
-            <div className="panel-head"><div><h3>Ventas de la semana</h3></div><div className="segmented"><button className={range === "Hoy" ? "selected" : ""} onClick={() => setRange("Hoy")}>7 días</button><button className={range === "Mes" ? "selected" : ""} onClick={() => setRange("Mes")}>30 días</button></div></div>
-            <div className="chart"><div className="axis"><span>S/ 1.5k</span><span>S/ 1.0k</span><span>S/ 500</span><span>S/ 0</span></div><div className="bars">{[0,0,0,0,0,0,totalVentasHoy > 0 ? Math.min(100, (totalVentasHoy / 1500) * 100) : 0].map((h,i)=><div className="bar-col" key={i}><div className={i===6?"bar best":"bar"} style={{height:`${Math.max(5, h)}%`}}><em>{i===6 && totalVentasHoy > 0 ? `S/ ${totalVentasHoy.toFixed(0)}`:""}</em></div><span>{["Lun","Mar","Mié","Jue","Vie","Sáb","Hoy"][i]}</span></div>)}</div></div>
+            <div className="panel-head"><div><h3>Ventas del periodo</h3></div><div className="segmented"><button className={range === "Hoy" ? "selected" : ""} onClick={() => setRange("Hoy")}>7 días</button><button className={range === "Mes" ? "selected" : ""} onClick={() => setRange("Mes")}>30 días</button></div></div>
+            <div className="chart">
+              <div className="axis">
+                <span>S/ 1.5k</span>
+                <span>S/ 1.0k</span>
+                <span>S/ 500</span>
+                <span>S/ 0</span>
+              </div>
+              <div className="bars">
+                {(() => {
+                  const numDays = range === "Hoy" ? 7 : 30;
+                  const dayLabels: string[] = [];
+                  const dayValues: number[] = Array(numDays).fill(0);
+                  const now = new Date();
+
+                  for (let i = numDays - 1; i >= 0; i--) {
+                    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+                    const label = numDays === 7 
+                      ? ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][d.getDay()]
+                      : String(d.getDate());
+                    dayLabels.push(label);
+
+                    const dateString = d.toISOString().split("T")[0];
+                    const dailyTotal = salesList
+                      .filter(s => s.fecha && s.fecha.split("T")[0] === dateString)
+                      .reduce((acc, curr) => acc + (curr.total || 0), 0);
+                    dayValues[numDays - 1 - i] = dailyTotal;
+                  }
+
+                  const maxVal = Math.max(...dayValues, 1);
+                  return dayValues.map((val, idx) => {
+                    const percentage = (val / maxVal) * 100;
+                    const isLast = idx === numDays - 1;
+                    return (
+                      <div className="bar-col" key={idx} style={{ flex: 1, minWidth: '8px' }}>
+                        <div className={isLast && val > 0 ? "bar best" : "bar"} style={{ height: `${Math.max(5, percentage)}%` }}>
+                          {val > 0 && <em style={{ fontSize: '9px', whiteSpace: 'nowrap' }}>S/ {val.toFixed(0)}</em>}
+                        </div>
+                        <span style={{ fontSize: '10px' }}>{dayLabels[idx]}</span>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
           </article>
           <article className="panel capital-panel">
             <div className="panel-head"><div><h3>Capital e inventario</h3></div></div>
@@ -540,7 +583,17 @@ export default function Home() {
 
     {clienteModal && <div className="modal-backdrop" onMouseDown={() => setClienteModal(false)}><section className="modal" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setClienteModal(false)}>×</button><span className="eyebrow">NUEVO CLIENTE</span><h2>Registrar cliente</h2><form onSubmit={handleSaveCliente}><div className="form-grid"><label>Nombre del cliente / Empresa<input type="text" placeholder="Ej. Cevichería El Sabor" value={cliNombre} onChange={(e)=>setCliNombre(e.target.value)} required /></label><label>Teléfono<input type="text" placeholder="Ej. 987654321" value={cliTelefono} onChange={(e)=>setCliTelefono(e.target.value)} /></label><label>Dirección<input type="text" placeholder="Ej. Av. Principal 123" value={cliDireccion} onChange={(e)=>setCliDireccion(e.target.value)} /></label><label>Tipo de cliente<select value={cliTipo} onChange={(e)=>setCliTipo(e.target.value)}><option value="Restaurante">Restaurante</option><option value="Negocio">Negocio</option><option value="Domicilio">Domicilio</option></select></label><label>Precio habitual (S/)<input type="number" value={cliPrecioHabitual} onChange={(e)=>setCliPrecioHabitual(Number(e.target.value))} step="0.5" required /></label></div><div className="modal-actions"><button type="button" onClick={()=>setClienteModal(false)}>Cancelar</button><button type="submit" className="primary" disabled={savingCliente}>{savingCliente ? "Guardando cliente…" : "Guardar cliente"}</button></div></form></section></div>}
 
-    {recargaModal && <div className="modal-backdrop" onMouseDown={() => setRecargaModal(false)}><section className="modal" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setRecargaModal(false)}>×</button><span className="eyebrow">ENVÍO A PLANTA</span><h2>Registrar envío a recarga</h2><form onSubmit={handleSaveRecarga}><div className="form-grid"><label>Cantidad vacíos Normal<input type="number" value={recQtyNormal} onChange={(e)=>setRecQtyNormal(Number(e.target.value))} min="0" required /></label><label>Cantidad vacíos Premium<input type="number" value={recQtyPremium} onChange={(e)=>setRecQtyPremium(Number(e.target.value))} min="0" required /></label></div><div className="modal-actions"><button type="button" onClick={()=>setRecargaModal(false)}>Cancelar</button><button type="submit" className="primary" disabled={savingRecarga}>{savingRecarga ? "Enviando…" : "Registrar envío a recarga"}</button></div></form></section></div>}
+    {recargaModal && <div className="modal-backdrop" onMouseDown={() => setRecargaModal(false)}><section className="modal" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setRecargaModal(false)}>×</button><span className="eyebrow">ENVÍO A PLANTA</span><h2>Registrar envío a recarga</h2><form onSubmit={handleSaveRecarga}><div className="form-grid"><label>Cantidad vacíos Normal<input type="text" value={recQtyNormal === 0 ? "" : recQtyNormal} onChange={(e)=>{
+      const val = e.target.value;
+      if (val === "" || /^\d+$/.test(val)) {
+        setRecQtyNormal(val === "" ? 0 : Number(val));
+      }
+    }} placeholder="0" /></label><label>Cantidad vacíos Premium<input type="text" value={recQtyPremium === 0 ? "" : recQtyPremium} onChange={(e)=>{
+      const val = e.target.value;
+      if (val === "" || /^\d+$/.test(val)) {
+        setRecQtyPremium(val === "" ? 0 : Number(val));
+      }
+    }} placeholder="0" /></label></div><div className="modal-actions"><button type="button" onClick={()=>setRecargaModal(false)}>Cancelar</button><button type="submit" className="primary" disabled={savingRecarga}>{savingRecarga ? "Enviando…" : "Registrar envío a recarga"}</button></div></form></section></div>}
 
     {gastoModal && <div className="modal-backdrop" onMouseDown={() => setGastoModal(false)}><section className="modal" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setGastoModal(false)}>×</button><span className="eyebrow">REGISTRO DE GASTO</span><h2>Registrar gasto diario</h2><form onSubmit={handleSaveGasto}><div className="form-grid"><label>Concepto del gasto<input type="text" placeholder="Ej. Combustible moto repartidora" value={gastoConcepto} onChange={(e)=>setGastoConcepto(e.target.value)} required /></label><label>Categoría<select value={gastoCategoria} onChange={(e)=>setGastoCategoria(e.target.value)}><option value="Combustible">Combustible</option><option value="Reparto">Reparto</option><option value="Mantenimiento">Mantenimiento</option><option value="Personal">Personal</option><option value="Otros">Otros</option></select></label><label>Monto (S/)<input type="number" value={gastoMonto} onChange={(e)=>setGastoMonto(Number(e.target.value))} min="1" step="0.5" required /></label><label>Forma de pago<select value={gastoPago} onChange={(e)=>setGastoPago(e.target.value)}><option value="Efectivo">Efectivo</option><option value="Yape">Yape / Plin</option><option value="Transferencia">Transferencia</option></select></label></div><div className="modal-actions"><button type="button" onClick={()=>setGastoModal(false)}>Cancelar</button><button type="submit" className="primary" disabled={savingGasto}>{savingGasto ? "Guardando gasto…" : "Guardar gasto"}</button></div></form></section></div>}
 
