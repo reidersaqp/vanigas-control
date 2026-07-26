@@ -21,6 +21,10 @@
 # misc
 .DS_Store
 *.pem
+vanigas-credentials.json
+*credentials*.json
+.google-drive-token.json
+client_secret*.json
 
 # debug
 npm-debug.log*

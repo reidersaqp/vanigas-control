@@ -76,7 +76,7 @@ function getLoginErrorMessage(error: unknown) {
   }
 
   if (details.code === 0 || details.message?.toLowerCase().includes("failed to fetch")) {
-    return "Appwrite está bloqueando la conexión. Revisa que el dominio de Vercel esté agregado en Platforms.";
+    return "Appwrite está bloqueando la conexión. Revisa que el dominio de Vercel está agregado en Platforms.";
   }
 
   return details.message || "No se pudo iniciar sesión. Revisa la configuración de Appwrite.";
@@ -449,9 +449,9 @@ export default function Home() {
   const ventasDigitales = salesList.filter(s => s.forma_pago !== "Efectivo").reduce((acc, curr) => acc + (curr.total || 0), 0);
 
   const normalLleno = inventory.find(i => i.tipo_balon === "Normal" && i.estado === "lleno")?.cantidad || 0;
-  const normalVacio = inventory.find(i => i.tipo_balon === "Normal" && i.estado === "vacío")?.cantidad || 0;
+  const normalVacio = inventory.find(i => i.tipo_balon === "Normal" && i.estado === "vac\u00edo")?.cantidad || 0;
   const premiumLleno = inventory.find(i => i.tipo_balon === "Premium" && i.estado === "lleno")?.cantidad || 0;
-  const premiumVacio = inventory.find(i => i.tipo_balon === "Premium" && i.estado === "vacío")?.cantidad || 0;
+  const premiumVacio = inventory.find(i => i.tipo_balon === "Premium" && i.estado === "vac\u00edo")?.cantidad || 0;
 
   const valorCargasLlenas = (normalLleno + premiumLleno) * 44.30;
   const valorReferencialTotal = valorCargasLlenas + (normalVacio * 20) + (premiumVacio * 22);
@@ -549,6 +549,8 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
   const totalGastos = gastos.reduce((a, b) => a + (b.monto || 0), 0);
   const totalEfectivo = sales.filter(s => s.forma_pago === "Efectivo").reduce((a, b) => a + (b.total || 0), 0);
   const totalDigital = sales.filter(s => s.forma_pago !== "Efectivo").reduce((a, b) => a + (b.total || 0), 0);
+  const [driveBackupState, setDriveBackupState] = useState<"idle" | "connecting" | "saving" | "success" | "error">("idle");
+  const [driveBackupMessage, setDriveBackupMessage] = useState("");
 
   function handleExportExcel() {
     if (view === "Ventas") {
@@ -618,6 +620,44 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
     printPDFReport(`Reporte Consolidado de Ventas e Inventario - VANIGAS`, summary, headers, rows);
   }
 
+  async function handleDriveBackup() {
+    try {
+      setDriveBackupState("connecting");
+      setDriveBackupMessage("Verificando conexión con Google Drive...");
+
+      const status = await fetch("/api/google/status").then((res) => res.json());
+      if (!status.connected) {
+        setDriveBackupMessage("Se abrirá Google para autorizar Drive. Luego vuelve y presiona este botón otra vez.");
+        window.location.href = "/api/google/auth";
+        return;
+      }
+
+      setDriveBackupState("saving");
+      setDriveBackupMessage("Generando archivo Excel y guardándolo directamente en Google Drive...");
+
+      const dateStr = new Date().toISOString().split("T")[0];
+      const filename = `Backup_VANIGAS_${dateStr}.xlsx`;
+      
+      const res = await fetch("/api/backup-drive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sales, inventory, gastos, recargas, clients, movimientos })
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || "Error al conectar con Drive");
+      }
+
+      setDriveBackupState("success");
+      setDriveBackupMessage(`Copia guardada correctamente en Google Drive: ${data.folderPath ? `${data.folderPath} / ` : ""}${data.filename || filename}`);
+    } catch (err: any) {
+      console.error("Error en respaldo directo a Drive:", err);
+      setDriveBackupState("error");
+      setDriveBackupMessage(err.message || "No se pudo guardar en Google Drive.");
+    }
+  }
+
   return <div className="content module-content">
     <section className="welcome-row">
       <div><h2>{copy[view]?.[0] || view}</h2></div>
@@ -638,7 +678,7 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
         <div className="caja-card">
           <span>Balones Vacíos (Almacén)</span>
           <strong style={{color: 'var(--color-warning)'}}>
-            {inventory.filter(i => i.estado === "vacío").reduce((a, b) => a + b.cantidad, 0)} unidades
+            {inventory.filter(i => i.estado === "vac\u00edo").reduce((a, b) => a + b.cantidad, 0)} unidades
           </strong>
         </div>
         <div className="caja-card highlight">
@@ -695,7 +735,7 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
        view === "Movimientos" ? <div className="table-wrap"><table><thead><tr><th>Fecha</th><th>Tipo movimiento</th><th>Balón</th><th>Estado</th><th>Cantidad</th><th>Observación</th></tr></thead><tbody>{movimientos.length === 0 ? <tr><td colSpan={6} style={{textAlign:'center',padding:'24px',color:'#718090'}}>Sin movimientos registrados aún. Se generarán al realizar ventas o recargas.</td></tr> : movimientos.map((mov, i) => <tr key={mov.$id || i}><td>{mov.fecha ? new Date(mov.fecha).toLocaleString([], { dateStyle:'short', timeStyle:'short' }) : "Hoy"}</td><td><b>{mov.tipo_movimiento}</b></td><td>{mov.tipo_balon}</td><td>{mov.estado_balon}</td><td><b>{mov.cantidad}</b></td><td>{mov.observacion || "Movimiento del sistema"}</td></tr>)}</tbody></table></div> :
        view === "Recargas" ? <div className="table-wrap"><table><thead><tr><th>Fecha envío</th><th>Tipo balón</th><th>Cant. enviada</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{recargas.length === 0 ? <tr><td colSpan={5} style={{textAlign:'center',padding:'24px',color:'#718090'}}>Sin recargas registradas aún. Registre envíos de balones vacíos a recarga.</td></tr> : recargas.map((rec, i) => <tr key={rec.$id || i}><td>{rec.fecha_envio ? new Date(rec.fecha_envio).toLocaleDateString() : "Hoy"}</td><td>{rec.tipo_balon}</td><td><b>{rec.cantidad_enviada} balones</b></td><td><span className={`pill ${rec.estado === "recibida" ? "normal" : "premium"}`}>{rec.estado || "enviada"}</span></td><td><div style={{display:'flex',gap:'6px'}}>{rec.estado !== "recibida" ? <button className="logout-button" style={{background:'#e6f4f1',color:'var(--teal)',fontWeight:800}} onClick={() => onRecepcionar(rec.$id || "", rec.tipo_balon, rec.cantidad_enviada)}>Recepcionar</button> : <span style={{fontSize:'11px',color:'var(--teal)',fontWeight:700}}>Recibidas</span>}{rec.$id && onRequestDelete ? <button className="delete-btn" onClick={() => onRequestDelete("recarga", rec.$id!, `el envío a recarga de ${rec.cantidad_enviada} balones`)}>Eliminar</button> : null}</div></td></tr>)}</tbody></table></div> :
        view === "Caja" ? <div className="caja-view-container"><div className="caja-summary-grid"><div className="caja-card"><span>Ventas en efectivo</span><strong>S/ {totalEfectivo.toFixed(2)}</strong></div><div className="caja-card"><span>Ventas digitales (Yape/Plin)</span><strong>S/ {totalDigital.toFixed(2)}</strong></div><div className="caja-card"><span>Gastos registrados</span><strong style={{color:'#c74e49'}}>S/ {totalGastos.toFixed(2)}</strong></div><div className="caja-card highlight"><span>Saldo en Caja Esperado</span><strong>S/ {(totalEfectivo - totalGastos).toFixed(2)}</strong></div></div><div className="table-wrap" style={{marginTop:'20px'}}><table><thead><tr><th>Concepto</th><th>Categoría</th><th>Monto</th><th>Forma de pago</th><th>Acciones</th></tr></thead><tbody>{gastos.length === 0 ? <tr><td colSpan={5} style={{textAlign:'center',padding:'20px',color:'#81909a'}}>No hay gastos registrados el día de hoy.</td></tr> : gastos.map((g, i) => <tr key={g.$id || i}><td><b>{g.concepto}</b></td><td>{g.categoria}</td><td>S/ {(g.monto || 0).toFixed(2)}</td><td>{g.forma_pago || "Efectivo"}</td><td>{g.$id && onRequestDelete ? <button className="delete-btn" onClick={() => onRequestDelete("gasto", g.$id!, `el gasto ${g.concepto} por S/ ${g.monto}`)}>Eliminar</button> : null}</td></tr>)}</tbody></table></div></div> :
-       view === "Reportes" ? <div className="reportes-container"><div className="caja-summary-grid"><div className="caja-card"><span>Ingreso Bruto Total</span><strong>S/ {totalVentas.toFixed(2)}</strong></div><div className="caja-card"><span>Ganancia Estimada</span><strong style={{color:'#1f9d73'}}>S/ {(totalVentas * 0.15 - totalGastos).toFixed(2)}</strong></div><div className="caja-card"><span>Balones Vendidos</span><strong>{sales.reduce((a,b)=>a+(b.cantidad||b.qty||0),0)} unidades</strong></div></div><div style={{display:'flex',gap:'12px',marginTop:'24px'}}><button className="primary" onClick={handleDownloadPDF}>Descargar Reporte PDF</button><button className="primary" style={{background:'#2670b8'}} onClick={handleExportExcel}>Exportar a Excel</button></div></div> :
+       view === "Reportes" ? <div className="reportes-container"><div className="caja-summary-grid"><div className="caja-card"><span>Ingreso Bruto Total</span><strong>S/ {totalVentas.toFixed(2)}</strong></div><div className="caja-card"><span>Ganancia Estimada</span><strong style={{color:'#1f9d73'}}>S/ {(totalVentas * 0.15 - totalGastos).toFixed(2)}</strong></div><div className="caja-card"><span>Balones Vendidos</span><strong>{sales.reduce((a,b)=>a+(b.cantidad||b.qty||0),0)} unidades</strong></div></div>{driveBackupState !== "idle" ? <div className={`drive-backup-status ${driveBackupState}`}><div><strong>{driveBackupState === "success" ? "Copia guardada" : driveBackupState === "error" ? "No se pudo guardar" : driveBackupState === "saving" ? "Guardando en Drive" : "Conectando Google Drive"}</strong><p>{driveBackupMessage}</p></div>{driveBackupState === "success" ? <span>✓</span> : driveBackupState === "error" ? <span>!</span> : <span className="drive-spinner" />}</div> : null}<div className="module-actions-row drive-actions"><button className="primary drive-save-button" onClick={handleDriveBackup} disabled={driveBackupState === "connecting" || driveBackupState === "saving"}>{driveBackupState === "saving" ? "Guardando..." : driveBackupState === "connecting" ? "Conectando..." : "Guardar copia en Google Drive (.xlsx)"}</button><button className="primary" onClick={handleDownloadPDF}>Descargar Reporte PDF</button><button className="primary" style={{background:'#2670b8'}} onClick={handleExportExcel}>Exportar a Excel</button></div></div> :
        <div className="empty-state"><h3>Módulo {view} sincronizado</h3><p>Información lista en Appwrite.</p></div>}
     </section>
   </div>;

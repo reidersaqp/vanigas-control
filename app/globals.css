@@ -88,6 +88,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 
 .brand-copy {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
 
@@ -97,13 +99,13 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   letter-spacing: 0.06em;
   font-size: var(--text-base);
   font-weight: 800;
-  line-height: 1;
+  line-height: 1.1;
 }
 
 .brand span {
   display: block;
-  font-size: var(--text-3xs);
-  margin-top: var(--space-3xs);
+  font-size: 10px;
+  margin-top: 2px;
   color: var(--color-rail-muted);
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -1535,6 +1537,96 @@ tr:hover td {
   color: var(--color-accent-ink);
 }
 
+.drive-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.drive-save-button {
+  background: #15803d !important;
+}
+
+.drive-save-button:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+
+.drive-backup-status {
+  margin-top: 20px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #14532d;
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  box-shadow: 0 12px 28px rgba(21, 128, 61, 0.08);
+}
+
+.drive-backup-status strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.drive-backup-status p {
+  margin: 4px 0 0;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.drive-backup-status > span:not(.drive-spinner) {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: #16a34a;
+  color: #fff;
+  font-weight: 900;
+}
+
+.drive-backup-status.error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  box-shadow: 0 12px 28px rgba(153, 27, 27, 0.08);
+}
+
+.drive-backup-status.error > span:not(.drive-spinner) {
+  background: #dc2626;
+}
+
+.drive-backup-status.connecting,
+.drive-backup-status.saving {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+  box-shadow: 0 12px 28px rgba(30, 58, 138, 0.08);
+}
+
+.drive-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 3px solid #bfdbfe;
+  border-top-color: #2563eb;
+  animation: drive-spin 0.8s linear infinite;
+  flex: 0 0 auto;
+}
+
+@keyframes drive-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Mobile Responsiveness (320px - 768px) */
 @media (max-width: 1024px) {
   .dashboard-grid, .dashboard-grid.lower {
@@ -1545,12 +1637,123 @@ tr:hover td {
   }
 }
 
+.module-actions-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 @media (max-width: 768px) {
+  .module-actions-row {
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+  .module-actions-row button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+  .app-shell {
+    flex-direction: column;
+  }
   .sidebar {
     width: 100%;
     height: auto;
     position: relative;
     box-shadow: none;
+    padding: 10px var(--space-xs);
+    border-right: none;
+    border-bottom: var(--rule-thin) solid var(--color-rail-rule);
+  }
+  .sidebar nav {
+    flex-direction: row;
+    overflow-x: auto;
+    white-space: nowrap;
+    margin-top: 8px;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+    gap: 6px;
+  }
+  .sidebar nav button {
+    padding: 6px 14px;
+    font-size: 13px;
+    flex-shrink: 0;
+    min-height: 2.2rem;
+  }
+  .topbar {
+    padding: 10px 14px;
+    height: auto;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .topbar h1 {
+    font-size: 1.25rem;
+  }
+  .top-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px !important;
+  }
+  .user {
+    border-left: none;
+    padding-left: 0;
+    margin-left: 0;
+  }
+  .content {
+    padding: 14px;
+  }
+  .welcome-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .welcome-row h2 {
+    font-size: 1.3rem;
+  }
+  .welcome-row button, .welcome-row .primary {
+    width: 100%;
+    justify-content: center;
+  }
+  .caja-summary-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .inventory-detail-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+    padding: 8px 0 !important;
+  }
+  .modal {
+    width: min(95vw, 500px) !important;
+    padding: 16px !important;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+  }
+  .modal-actions {
+    flex-direction: column-reverse !important;
+    gap: 8px !important;
+  }
+  .modal-actions button {
+    width: 100% !important;
+  }
+  .reportes-container button {
+    width: 100% !important;
+  }
+  .caja-view-container {
+    padding: 0 !important;
+  }
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-sm);
+  }
+  .table-wrap table {
+    min-width: 600px;
   }
   .workspace {
     margin-left: 0;
@@ -1559,7 +1762,29 @@ tr:hover td {
     grid-template-columns: minmax(0, 1fr);
   }
   .stock-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    padding: 10px !important;
+  }
+  .stock-item {
+    border-right: none !important;
+    border-bottom: 1px solid var(--color-rule);
+    padding: 8px 4px !important;
+    gap: 8px !important;
+  }
+  .stock-item:nth-child(3), .stock-item:nth-child(4) {
+    border-bottom: none !important;
+  }
+  .stock-img {
+    width: 3.2rem !important;
+    height: 3.8rem !important;
+  }
+  .stock-item strong {
+    font-size: 1.4rem !important;
+  }
+  .stock-item p {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
   }
   .login-page {
     grid-template-columns: minmax(0, 1fr);
@@ -1600,8 +1825,6 @@ tr:hover td {
   }
 }
 
-}
-
 /* Session Loading Spinner Screen */
 .session-loading {
   min-height: 100vh;
@@ -1640,4 +1863,3 @@ tr:hover td {
     transform: rotate(360deg);
   }
 }
-
