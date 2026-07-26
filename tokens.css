@@ -1,0 +1,115 @@
+:root {
+  --color-paper: oklch(99% 0.01 78);
+  --color-paper-2: oklch(96% 0.018 72);
+  --color-paper-3: oklch(93% 0.022 70);
+  --color-ink: oklch(22% 0.025 54);
+  --color-muted: oklch(49% 0.025 58);
+  --color-rule: oklch(86% 0.022 70);
+  --color-rule-strong: oklch(76% 0.03 68);
+  --color-accent: oklch(48% 0.17 28);
+  --color-accent-strong: oklch(38% 0.15 28);
+  --color-accent-ink: oklch(99% 0.01 78);
+  --color-accent-soft: oklch(94% 0.045 34);
+  --color-accent-rule: oklch(78% 0.075 34);
+  --color-focus: oklch(61% 0.16 52);
+  --color-warning: oklch(66% 0.14 74);
+  --color-warning-ink: oklch(22% 0.025 54);
+  --color-warning-soft: oklch(95% 0.048 76);
+  --color-warning-rule: oklch(82% 0.09 76);
+  --color-success: oklch(47% 0.11 145);
+  --color-success-soft: oklch(92% 0.045 145);
+  --color-success-rule: oklch(76% 0.08 145);
+  --color-info: oklch(45% 0.11 235);
+  --color-info-soft: oklch(92% 0.035 235);
+  --color-info-rule: oklch(76% 0.07 235);
+  --color-danger: oklch(48% 0.17 28);
+  --color-danger-ink: oklch(99% 0.01 78);
+  --color-danger-soft: oklch(94% 0.045 34);
+  --color-danger-rule: oklch(78% 0.075 34);
+  --color-rail: oklch(21% 0.026 50);
+  --color-rail-panel: oklch(25% 0.028 50);
+  --color-rail-rule: oklch(34% 0.03 50);
+  --color-rail-text: oklch(84% 0.025 68);
+  --color-rail-title: oklch(98% 0.012 76);
+  --color-rail-muted: oklch(70% 0.06 74);
+  --color-rail-chip: oklch(29% 0.028 50);
+  --color-rail-hover: oklch(28% 0.03 50);
+  --color-rail-active: oklch(32% 0.035 50);
+  --color-scrim: oklch(18% 0.028 50 / 74%);
+
+  --font-display: Arial, "Helvetica Neue", sans-serif;
+  --font-body: Arial, "Helvetica Neue", sans-serif;
+  --font-mono: "Courier New", monospace;
+
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.5rem;
+  --space-xs: 0.75rem;
+  --space-sm: 1rem;
+  --space-md: 1.5rem;
+  --space-lg: 2rem;
+  --space-xl: 3rem;
+  --space-2xl: 4.5rem;
+  --space-3xl: 6rem;
+  --space-4xl: 7rem;
+
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 1.875rem;
+  --text-3xl: 2.5rem;
+  --text-display: 3.75rem;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-short: 160ms;
+  --dur-medium: 220ms;
+  --dur-spin: 800ms;
+
+  --rule-thin: 1px;
+  --rule-focus: 2px;
+  --rule-accent: 3px;
+  --rule-banner: 8px;
+  --radius-xs: 0.375rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-pill: 999px;
+  --radius-round: 50%;
+
+  --rail-width: 15.5rem;
+  --rail-width-sm: 12.8125rem;
+  --rail-width-xs: 4.25rem;
+  --content-max: 95rem;
+  --topbar-height: 5.125rem;
+  --topbar-height-sm: 4.375rem;
+  --control-xs: 1.75rem;
+  --control-sm: 2.25rem;
+  --control-md: 2.75rem;
+  --control-lg: 3.5rem;
+  --size-brand: 3.125rem;
+  --size-login-logo: 3.625rem;
+  --size-icon-col: 1.5rem;
+  --size-cylinder-w: 1.875rem;
+  --size-cylinder-h: 2.3125rem;
+  --chart-height: 12.375rem;
+  --axis-width: 3rem;
+  --empty-height: 21.875rem;
+  --modal-width: 37.5rem;
+  --login-card-width: 36.25rem;
+  --measure-sm: 48ch;
+  --measure-md: 64ch;
+  --nudge-down: 1px;
+
+  --z-nav: 5;
+  --z-sticky-nav: 4;
+  --z-modal: 20;
+
+  --shadow-soft: 0 1px 2px oklch(22% 0.025 54 / 8%);
+  --shadow-chip: 0 1px 3px oklch(22% 0.025 54 / 14%);
+  --shadow-button: 0 8px 18px oklch(48% 0.17 28 / 20%);
+  --shadow-modal: 0 28px 70px oklch(22% 0.025 54 / 26%);
+}

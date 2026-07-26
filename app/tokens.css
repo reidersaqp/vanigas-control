@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@500;700&display=swap');
+
+:root {
+  --color-paper: oklch(99.5% 0.003 240);
+  --color-paper-2: oklch(97.5% 0.008 240);
+  --color-paper-3: oklch(94.5% 0.012 240);
+  --color-ink: oklch(18% 0.02 240);
+  --color-muted: oklch(48% 0.02 240);
+  --color-rule: oklch(89% 0.01 240);
+  --color-rule-strong: oklch(80% 0.02 240);
+  
+  /* Brand Flame Accent (VANIGAS Red/Crimson) */
+  --color-accent: oklch(52% 0.22 25);
+  --color-accent-strong: oklch(42% 0.22 25);
+  --color-accent-ink: oklch(99% 0.005 25);
+  --color-accent-soft: oklch(94% 0.04 25);
+  --color-accent-rule: oklch(80% 0.09 25);
+  
+  --color-focus: oklch(58% 0.18 240);
+  --color-warning: oklch(68% 0.16 70);
+  --color-warning-ink: oklch(20% 0.03 70);
+  --color-warning-soft: oklch(95% 0.04 70);
+  --color-warning-rule: oklch(84% 0.08 70);
+  
+  --color-success: oklch(52% 0.15 150);
+  --color-success-soft: oklch(94% 0.04 150);
+  --color-success-rule: oklch(80% 0.08 150);
+  
+  --color-info: oklch(50% 0.15 245);
+  --color-info-soft: oklch(94% 0.03 245);
+  --color-info-rule: oklch(80% 0.07 245);
+  
+  --color-danger: oklch(52% 0.22 25);
+  --color-danger-ink: oklch(99% 0.005 25);
+  --color-danger-soft: oklch(94% 0.04 25);
+  --color-danger-rule: oklch(80% 0.09 25);
+  
+  /* Deep Tactile Rail (Sidebar) */
+  --color-rail: oklch(16% 0.02 250);
+  --color-rail-panel: oklch(20% 0.025 250);
+  --color-rail-rule: oklch(26% 0.02 250);
+  --color-rail-text: oklch(82% 0.015 240);
+  --color-rail-title: oklch(98% 0.005 240);
+  --color-rail-muted: oklch(62% 0.02 240);
+  --color-rail-chip: oklch(23% 0.02 250);
+  --color-rail-hover: oklch(24% 0.025 250);
+  --color-rail-active: oklch(28% 0.03 250);
+  --color-scrim: oklch(12% 0.02 240 / 78%);
+
+  --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, monospace;
+
+  --text-3xs: 0.68rem;
+  --text-2xs: 0.78rem;
+  --text-xs: 0.86rem;
+  --text-sm: 0.96rem;
+  --text-base: 1.08rem;
+  --text-lg: 1.28rem;
+  --text-xl: 1.56rem;
+  --text-2xl: 2.05rem;
+  --text-3xl: 2.65rem;
+
+  --space-3xs: 0.2rem;
+  --space-2xs: 0.4rem;
+  --space-xs: 0.7rem;
+  --space-sm: 1.0rem;
+  --space-md: 1.5rem;
+  --space-lg: 2.2rem;
+  --space-xl: 3.2rem;
+  --space-2xl: 5.0rem;
+
+  --radius-xs: 4px;
+  --radius-sm: 7px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 9999px;
+  --radius-round: 50%;
+
+  --rule-thin: 1px;
+  --rule-thick: 2px;
+  --rule-accent: 4px;
+  --rule-focus: 2px;
+
+  --elevation-low: 0 2px 4px -1px oklch(0% 0 0 / 6%), 0 1px 2px -1px oklch(0% 0 0 / 4%);
+  --elevation-mid: 0 10px 25px -3px oklch(0% 0 0 / 8%), 0 4px 6px -2px oklch(0% 0 0 / 3%);
+  --elevation-high: 0 20px 40px -5px oklch(0% 0 0 / 14%), 0 8px 16px -4px oklch(0% 0 0 / 6%);
+
+  --z-base: 0;
+  --z-nav: 100;
+  --z-overlay: 200;
+  --z-modal: 300;
+  --z-toast: 400;
+
+  --size-brand: 2.5rem;
+  --size-icon-col: 2.0rem;
+  --rail-width: 15.5rem;
+  --control-md: 2.5rem;
+}

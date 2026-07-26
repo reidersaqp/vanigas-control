@@ -1,0 +1,10 @@
+[
+  {
+    "date": "2026-07-25",
+    "scope": "single-page-app",
+    "macrostructure": "Workbench",
+    "theme": "custom-brand-operational",
+    "enrichment": "none",
+    "brief": "VANIGAS inventory dashboard redesign without AI-looking colors"
+  }
+]
