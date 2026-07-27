@@ -178,9 +178,11 @@ export default function Home() {
   const [saleType, setSaleType] = useState("Normal");
   const [saleQty, setSaleQty] = useState(1);
   const [salePrice, setSalePrice] = useState(52);
-  const [salePayment, setSalePayment] = useState("Efectivo");
+  const [salePayment, setSalePayment] = useState("Por definir");
   const [saleVacios, setSaleVacios] = useState(1);
-  const [saleEstado, setSaleEstado] = useState("confirmada");
+  const [saleEstado, setSaleEstado] = useState("pendiente");
+  const [saleTelefono, setSaleTelefono] = useState("");
+  const [saleUbicacionUrl, setSaleUbicacionUrl] = useState("");
   const [savingSale, setSavingSale] = useState(false);
 
   // New Gasto Form State
@@ -279,11 +281,16 @@ export default function Home() {
         vacios_recibidos: Number(saleVacios),
         usuario_id: currentUser?.$id || "session_user",
         estado: saleEstado,
+        telefono: saleTelefono.trim(),
+        ubicacion_url: saleUbicacionUrl.trim(),
       });
       await loadAppwriteContent();
       setModal(false);
       setSaleClient("");
-      setSaleEstado("confirmada");
+      setSaleEstado("pendiente");
+      setSalePayment("Por definir");
+      setSaleTelefono("");
+      setSaleUbicacionUrl("");
     } catch (err: any) {
       console.error("Error saving sale:", err);
     } finally {
@@ -579,7 +586,27 @@ export default function Home() {
       </div> : <ModuleView view={view} onAdd={() => setModal(true)} onAddGasto={() => setGastoModal(true)} onCierreCaja={() => setCierreModal(true)} onAddCliente={() => setClienteModal(true)} onAddRecarga={() => setRecargaModal(true)} onRecepcionar={handleRecepcionar} sales={salesList} inventory={inventory} clients={clientsList} gastos={gastosList} movimientos={movimientosList} recargas={recargasList} onAdjust={handleAdjustStock} onRequestDelete={handleRequestDelete} galonesChofer={galonesChofer} setGalonesChofer={setGalonesChofer} savingGalones={savingGalones} setSavingGalones={setSavingGalones} saveGalonesHoy={saveGalonesHoy} />}
     </section>
 
-    {modal && <div className="modal-backdrop" onMouseDown={() => setModal(false)}><section className="modal" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setModal(false)}>×</button><span className="eyebrow">NUEVA OPERACIÓN</span><h2>Registrar venta</h2><form onSubmit={handleSaveSale}><div className="form-grid"><label>Nombre del cliente{clientsList.length > 0 ? <select value={saleClient} onChange={(e)=>setSaleClient(e.target.value)}><option value="">-- Seleccionar o escribir cliente --</option>{clientsList.map(c => <option key={c.nombre} value={c.nombre}>{c.nombre} ({c.tipo_cliente})</option>)}</select> : null}<input type="text" placeholder="Escribir nombre de cliente" value={saleClient} onChange={(e)=>setSaleClient(e.target.value)} required /></label><label>Tipo de cliente<select value={saleClientType} onChange={(e)=>setSaleClientType(e.target.value)}><option value="Restaurante">Restaurante</option><option value="Negocio">Negocio</option><option value="Domicilio">Domicilio</option></select></label><label>Tipo de balón<select value={saleType} onChange={(e)=>{ setSaleType(e.target.value); setSalePrice(e.target.value === "Premium" ? 55 : 52); }}><option value="Normal">Normal</option><option value="Premium">Premium</option></select></label><label>Cantidad<input type="number" value={saleQty} onChange={(e)=>setSaleQty(Number(e.target.value))} min="1" required /></label><label>Precio unitario (S/)<input type="number" value={salePrice} onChange={(e)=>setSalePrice(Number(e.target.value))} step="0.5" required /></label><label>Forma de pago<select value={salePayment} onChange={(e)=>setSalePayment(e.target.value)}><option value="Efectivo">Efectivo</option><option value="Yape">Yape / Plin</option><option value="Transferencia">Transferencia</option><option value="Crédito">Crédito</option></select></label><label>Estado de entrega<select value={saleEstado} onChange={(e)=>setSaleEstado(e.target.value)}><option value="confirmada">Completo (Entregado y cobrado)</option><option value="debe_pago">Debe pagar</option><option value="debe_balon">Debe balón</option><option value="debe_ambos">Debe ambos</option></select></label><label>Vacíos recibidos<input type="number" value={saleVacios} onChange={(e)=>setSaleVacios(Number(e.target.value))} min="0" required /></label></div><div className="sale-total"><span>Total de la venta</span><strong>S/ {(saleQty * salePrice).toFixed(2)}</strong></div><div className="modal-actions"><button type="button" onClick={()=>setModal(false)}>Cancelar</button><button type="submit" className="primary" disabled={savingSale}>{savingSale ? "Guardando…" : "Guardar venta"}</button></div></form></section></div>}
+    {modal && <div className="modal-backdrop" onMouseDown={() => setModal(false)}><section className="modal" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setModal(false)}>×</button><span className="eyebrow">NUEVA OPERACIÓN</span><h2>Registrar venta</h2><form onSubmit={handleSaveSale}>
+      <div style={{marginBottom:'16px'}}>
+        <button type="button" onClick={async () => {
+          try {
+            const text = await navigator.clipboard.readText();
+            if (text) {
+              const phoneMatch = text.match(/\b9\d{8}\b/);
+              if (phoneMatch) setSaleTelefono(phoneMatch[0]);
+              const urlMatch = text.match(/https?:\/\/[^\s]+/);
+              if (urlMatch) setSaleUbicacionUrl(urlMatch[0]);
+            }
+          } catch (e) {
+            console.error("Error al leer portapapeles:", e);
+          }
+        }} style={{width:'100%',padding:'12px',background:'#2563eb',color:'#fff',border:'none',borderRadius:'8px',fontWeight:700,cursor:'pointer',fontSize:'14px'}}>Pegar datos desde WhatsApp</button>
+      </div>
+      <div className="form-grid"><label>Nombre del cliente{clientsList.length > 0 ? <select value={saleClient} onChange={(e)=>{
+        const selected = clientsList.find(c => c.nombre === e.target.value);
+        setSaleClient(e.target.value);
+        if (selected && selected.telefono) setSaleTelefono(selected.telefono);
+      }}><option value="">-- Seleccionar o escribir cliente --</option>{clientsList.map(c => <option key={c.nombre} value={c.nombre}>{c.nombre} ({c.tipo_cliente})</option>)}</select> : null}<input type="text" placeholder="Escribir nombre de cliente" value={saleClient} onChange={(e)=>setSaleClient(e.target.value)} required /></label><label>Teléfono<input type="text" placeholder="Ej. 987654321" value={saleTelefono} onChange={(e)=>setSaleTelefono(e.target.value)} /></label><label>Enlace de Ubicación GPS<input type="text" placeholder="Ej. https://maps.google.com/..." value={saleUbicacionUrl} onChange={(e)=>setSaleUbicacionUrl(e.target.value)} /></label><label>Tipo de cliente<select value={saleClientType} onChange={(e)=>setSaleClientType(e.target.value)}><option value="Restaurante">Restaurante</option><option value="Negocio">Negocio</option><option value="Domicilio">Domicilio</option></select></label><label>Tipo de balón<select value={saleType} onChange={(e)=>{ setSaleType(e.target.value); setSalePrice(e.target.value === "Premium" ? 55 : 52); }}><option value="Normal">Normal</option><option value="Premium">Premium</option></select></label><label>Cantidad<input type="number" value={saleQty} onChange={(e)=>setSaleQty(Number(e.target.value))} min="1" required /></label><label>Precio unitario (S/)<input type="number" value={salePrice} onChange={(e)=>setSalePrice(Number(e.target.value))} step="0.5" required /></label><label>Forma de pago<select value={salePayment} onChange={(e)=>setSalePayment(e.target.value)}><option value="Por definir">Por definir (En entrega)</option><option value="Efectivo">Efectivo</option><option value="Yape">Yape / Plin</option><option value="Transferencia">Transferencia</option><option value="Crédito">Crédito</option></select></label><label>Estado de entrega<select value={saleEstado} onChange={(e)=>setSaleEstado(e.target.value)}><option value="pendiente">Pendiente (Por entregar)</option><option value="confirmada">Completo (Entregado y cobrado)</option><option value="debe_pago">Debe pagar</option><option value="debe_balon">Debe balón</option><option value="debe_ambos">Debe ambos</option></select></label></div><div className="sale-total"><span>Total de la venta</span><strong>S/ {(saleQty * salePrice).toFixed(2)}</strong></div><div className="modal-actions"><button type="button" onClick={()=>setModal(false)}>Cancelar</button><button type="submit" className="primary" disabled={savingSale}>{savingSale ? "Guardando…" : "Guardar venta"}</button></div></form></section></div>}
 
     {clienteModal && <div className="modal-backdrop" onMouseDown={() => setClienteModal(false)}><section className="modal" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setClienteModal(false)}>×</button><span className="eyebrow">NUEVO CLIENTE</span><h2>Registrar cliente</h2><form onSubmit={handleSaveCliente}><div className="form-grid"><label>Nombre del cliente / Empresa<input type="text" placeholder="Ej. Cevichería El Sabor" value={cliNombre} onChange={(e)=>setCliNombre(e.target.value)} required /></label><label>Teléfono<input type="text" placeholder="Ej. 987654321" value={cliTelefono} onChange={(e)=>setCliTelefono(e.target.value)} /></label><label>Dirección<input type="text" placeholder="Ej. Av. Principal 123" value={cliDireccion} onChange={(e)=>setCliDireccion(e.target.value)} /></label><label>Tipo de cliente<select value={cliTipo} onChange={(e)=>setCliTipo(e.target.value)}><option value="Restaurante">Restaurante</option><option value="Negocio">Negocio</option><option value="Domicilio">Domicilio</option></select></label><label>Precio habitual (S/)<input type="number" value={cliPrecioHabitual} onChange={(e)=>setCliPrecioHabitual(Number(e.target.value))} step="0.5" required /></label></div><div className="modal-actions"><button type="button" onClick={()=>setClienteModal(false)}>Cancelar</button><button type="submit" className="primary" disabled={savingCliente}>{savingCliente ? "Guardando cliente…" : "Guardar cliente"}</button></div></form></section></div>}
 

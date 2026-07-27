@@ -28,6 +28,8 @@ export interface SaleItem {
   type?: string;
   id?: string;
   estado?: string;
+  telefono?: string;
+  ubicacion_url?: string;
 }
 
 export interface ClientItem {
@@ -198,6 +200,8 @@ export async function fetchVentas(): Promise<SaleItem[]> {
     qty: doc.cantidad || 0,
     type: doc.tipo_balon,
     estado: doc.estado || "confirmada",
+    telefono: doc.telefono || "",
+    ubicacion_url: doc.ubicacion_url || "",
   }));
 }
 
@@ -268,6 +272,8 @@ export async function createVenta(venta: {
   vacios_recibidos: number;
   usuario_id: string;
   estado?: string;
+  telefono?: string;
+  ubicacion_url?: string;
 }): Promise<void> {
   const total = venta.cantidad * venta.precio_unitario;
   const fecha = new Date().toISOString();
@@ -289,6 +295,8 @@ export async function createVenta(venta: {
       vacios_recibidos: venta.vacios_recibidos,
       usuario_id: venta.usuario_id,
       estado: venta.estado || "confirmada",
+      telefono: venta.telefono || "",
+      ubicacion_url: venta.ubicacion_url || "",
     }
   });
 

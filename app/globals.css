@@ -1016,13 +1016,17 @@ tr:hover td {
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   z-index: var(--z-modal);
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: var(--space-md);
+  overflow-y: auto;
 }
 
 .modal {
   width: min(560px, 100%);
+  max-height: 80vh;
+  overflow-y: auto !important;
   background: var(--color-paper);
   border: var(--rule-thin) solid var(--color-rule);
   border-radius: var(--radius-lg);
