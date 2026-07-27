@@ -16,6 +16,36 @@ const menu: { label: View; icon: string }[] = [
   { label: "Caja", icon: "" }, { label: "Reportes", icon: "" },
 ];
 
+function toDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getTodayDateKey() {
+  return toDateKey(new Date());
+}
+
+function rowDateKey(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+  return toDateKey(date);
+}
+
+function formatDateLabel(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  const formatted = date.toLocaleDateString("es-PE", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
 function StatCard({ label, value, detail }: { label: string; value: string; detail: string; accent: string }) {
   return <article className="stat-card">
     <p>{label}</p><strong>{value}</strong><span>{detail}</span>
@@ -24,7 +54,7 @@ function StatCard({ label, value, detail }: { label: string; value: string; deta
 
 function SalesTable({ sales, onRequestDelete }: { sales: SaleItem[]; onRequestDelete?: (type: "venta", id: string, label: string) => void }) {
   if (sales.length === 0) {
-    return <div className="empty-state"><h3>Sin ventas registradas hoy</h3><p>Las ventas que registre en el sistema aparecerán aquí en tiempo real.</p></div>;
+    return <div className="empty-state"><h3>Sin ventas registradas para esta fecha</h3><p>Las ventas que registre en el sistema aparecer?n aqu? en tiempo real.</p></div>;
   }
 
   return <div className="table-wrap"><table>
@@ -153,6 +183,7 @@ export default function Home() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [view, setView] = useState<View>("Resumen");
   const [range, setRange] = useState("Hoy");
+  const [selectedDate, setSelectedDate] = useState(getTodayDateKey());
   const [modal, setModal] = useState(false);
   const [gastoModal, setGastoModal] = useState(false);
   const [cierreModal, setCierreModal] = useState(false);
@@ -212,16 +243,8 @@ export default function Home() {
 
   const title = useMemo(() => view === "Resumen" ? "Resumen del negocio" : view, [view]);
 
-  const currentDateStr = useMemo(() => {
-    const date = new Date();
-    const formatted = date.toLocaleDateString("es-PE", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric"
-    });
-    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
-  }, []);
+  const currentDateStr = useMemo(() => formatDateLabel(selectedDate), [selectedDate]);
+  const isTodaySelected = selectedDate === getTodayDateKey();
 
   useEffect(() => {
     account.get()
@@ -461,16 +484,20 @@ export default function Home() {
   const visibleMenu = menu;
 
   // Dynamic calculations from Appwrite Database
-  const totalVentasHoy = salesList.reduce((acc, curr) => acc + (curr.total || 0), 0);
-  const totalBalonesHoy = salesList.reduce((acc, curr) => acc + (curr.cantidad || curr.qty || 0), 0);
-  const totalGastosHoy = gastosList.reduce((acc, curr) => acc + (curr.monto || 0), 0);
+  const selectedSales = salesList.filter((sale) => rowDateKey(sale.fecha) === selectedDate);
+  const selectedGastos = gastosList.filter((gasto) => rowDateKey(gasto.fecha) === selectedDate);
+  const selectedMovimientos = movimientosList.filter((movimiento) => rowDateKey(movimiento.fecha) === selectedDate);
+
+  const totalVentasHoy = selectedSales.reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const totalBalonesHoy = selectedSales.reduce((acc, curr) => acc + (curr.cantidad || curr.qty || 0), 0);
+  const totalGastosHoy = selectedGastos.reduce((acc, curr) => acc + (curr.monto || 0), 0);
 
   const costoTotalBalones = totalBalonesHoy * 44.30;
   const gananciaBruta = Math.max(0, totalVentasHoy - costoTotalBalones);
   const gananciaEstimada = Math.max(0, gananciaBruta - totalGastosHoy);
 
-  const ventasEfectivo = salesList.filter(s => s.forma_pago === "Efectivo").reduce((acc, curr) => acc + (curr.total || 0), 0);
-  const ventasDigitales = salesList.filter(s => s.forma_pago !== "Efectivo").reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const ventasEfectivo = selectedSales.filter(s => s.forma_pago === "Efectivo").reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const ventasDigitales = selectedSales.filter(s => s.forma_pago !== "Efectivo").reduce((acc, curr) => acc + (curr.total || 0), 0);
 
   const normalLleno = inventory.find(i => i.tipo_balon === "Normal" && i.estado === "lleno")?.cantidad || 0;
   const normalVacio = inventory.find(i => i.tipo_balon === "Normal" && i.estado === "vac\u00edo")?.cantidad || 0;
@@ -496,6 +523,11 @@ export default function Home() {
       <header className="topbar">
         <div><h1>{title}</h1><p>{currentDateStr}</p></div>
         <div className="top-actions">
+          <div className="date-filter" aria-label="Filtro por fecha">
+            <label htmlFor="sales-date">Fecha de trabajo</label>
+            <input id="sales-date" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value || getTodayDateKey())} />
+            {!isTodaySelected ? <button type="button" onClick={() => setSelectedDate(getTodayDateKey())}>Hoy</button> : null}
+          </div>
           <div className="user"><div><b>{userName}</b></div><button className="logout-button" onClick={logout}>Salir</button></div>
         </div>
       </header>
@@ -504,9 +536,9 @@ export default function Home() {
         <section className="welcome-row"><div><h2>Buenos días, {userName}</h2></div><button className="primary" onClick={() => setModal(true)}>Registrar venta</button></section>
 
         <section className="stats-grid">
-          <StatCard label="Ventas de hoy" value={`S/ ${totalVentasHoy.toFixed(2)}`} detail={`${totalBalonesHoy} balones vendidos`} accent="teal" />
+          <StatCard label={isTodaySelected ? "Ventas de hoy" : "Ventas de la fecha"} value={`S/ ${totalVentasHoy.toFixed(2)}`} detail={`${totalBalonesHoy} balones vendidos`} accent="teal" />
           <StatCard label="Ganancia bruta" value={`S/ ${gananciaBruta.toFixed(2)}`} detail="15% de las ventas" accent="blue" />
-          <StatCard label="Gastos de hoy" value={`S/ ${totalGastosHoy.toFixed(2)}`} detail={`${gastosList.length} registro(s)`} accent="amber" />
+          <StatCard label={isTodaySelected ? "Gastos de hoy" : "Gastos de la fecha"} value={`S/ ${totalGastosHoy.toFixed(2)}`} detail={`${selectedGastos.length} registro(s)`} accent="amber" />
           <StatCard label="Ganancia estimada" value={`S/ ${gananciaEstimada.toFixed(2)}`} detail="Después de gastos" accent="green" />
         </section>
 
@@ -549,9 +581,9 @@ export default function Home() {
                       : String(d.getDate());
                     dayLabels.push(label);
 
-                    const dateString = d.toISOString().split("T")[0];
+                    const dateString = toDateKey(d);
                     const dailyTotal = salesList
-                      .filter(s => s.fecha && s.fecha.split("T")[0] === dateString)
+                      .filter(s => rowDateKey(s.fecha) === dateString)
                       .reduce((acc, curr) => acc + (curr.total || 0), 0);
                     dayValues[numDays - 1 - i] = dailyTotal;
                   }
@@ -582,8 +614,8 @@ export default function Home() {
           </article>
         </section>
 
-        <section className="panel sales-panel"><div className="panel-head"><div><h3>Últimas ventas</h3></div><button onClick={() => setView("Ventas")}>Ver todas</button></div><SalesTable sales={salesList} onRequestDelete={handleRequestDelete} /></section>
-      </div> : <ModuleView view={view} onAdd={() => setModal(true)} onAddGasto={() => setGastoModal(true)} onCierreCaja={() => setCierreModal(true)} onAddCliente={() => setClienteModal(true)} onAddRecarga={() => setRecargaModal(true)} onRecepcionar={handleRecepcionar} sales={salesList} inventory={inventory} clients={clientsList} gastos={gastosList} movimientos={movimientosList} recargas={recargasList} onAdjust={handleAdjustStock} onRequestDelete={handleRequestDelete} galonesChofer={galonesChofer} setGalonesChofer={setGalonesChofer} savingGalones={savingGalones} setSavingGalones={setSavingGalones} saveGalonesHoy={saveGalonesHoy} />}
+        <section className="panel sales-panel"><div className="panel-head"><div><h3>Últimas ventas</h3></div><button onClick={() => setView("Ventas")}>Ver todas</button></div><SalesTable sales={selectedSales} onRequestDelete={handleRequestDelete} /></section>
+      </div> : <ModuleView view={view} onAdd={() => setModal(true)} onAddGasto={() => setGastoModal(true)} onCierreCaja={() => setCierreModal(true)} onAddCliente={() => setClienteModal(true)} onAddRecarga={() => setRecargaModal(true)} onRecepcionar={handleRecepcionar} sales={selectedSales} inventory={inventory} clients={clientsList} gastos={selectedGastos} movimientos={selectedMovimientos} recargas={recargasList} onAdjust={handleAdjustStock} onRequestDelete={handleRequestDelete} galonesChofer={galonesChofer} setGalonesChofer={setGalonesChofer} savingGalones={savingGalones} setSavingGalones={setSavingGalones} saveGalonesHoy={saveGalonesHoy} />}
     </section>
 
     {modal && <div className="modal-backdrop" onMouseDown={() => setModal(false)}><section className="modal" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setModal(false)}>×</button><span className="eyebrow">NUEVA OPERACIÓN</span><h2>Registrar venta</h2><form onSubmit={handleSaveSale}>
