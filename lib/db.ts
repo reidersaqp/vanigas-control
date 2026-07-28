@@ -472,6 +472,8 @@ export async function deleteRecarga(rowId: string): Promise<void> {
 export async function createRecarga(recarga: {
   tipo_balon: string;
   cantidad_enviada: number;
+  costo_unitario?: number;
+  costo_total?: number;
   proveedor?: string;
   usuario_id: string;
 }): Promise<void> {
@@ -486,6 +488,8 @@ export async function createRecarga(recarga: {
       fecha_envio,
       tipo_balon: recarga.tipo_balon,
       cantidad_enviada: recarga.cantidad_enviada,
+      costo_unitario: recarga.costo_unitario || 0,
+      costo_total: recarga.costo_total || 0,
       proveedor: recarga.proveedor || "Planta Solgas",
       estado: "enviada",
       usuario_id: recarga.usuario_id,
@@ -500,7 +504,7 @@ export async function createRecarga(recarga: {
     estado_balon: "vacío",
     cantidad: recarga.cantidad_enviada,
     usuario_id: recarga.usuario_id,
-    observacion: `Envío de ${recarga.cantidad_enviada} balones vacíos a ${recarga.proveedor || "Planta Solgas"}`,
+    observacion: `Envío de ${recarga.cantidad_enviada} balones vacíos a ${recarga.proveedor || "Planta Solgas"}${recarga.costo_unitario ? ` - Costo S/ ${recarga.costo_unitario.toFixed(2)} c/u` : ""}`,
   }).catch(() => {});
 }
 
