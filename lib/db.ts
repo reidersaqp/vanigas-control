@@ -243,14 +243,17 @@ export async function clearAllMovimientos(): Promise<void> {
 }
 
 export async function fetchMovimientos(): Promise<MovementItem[]> {
-  const res = await tablesDB.listRows({
-    databaseId: DATABASE_ID,
-    tableId: "movimientos",
-    queries: [Query.orderDesc("fecha"), Query.limit(100)]
-  });
-  // Filter out any leftover manual adjustment test logs
-  const realMovs = res.rows.filter((m: any) => !m.observacion?.includes("Ajuste manual"));
-  return realMovs as unknown as MovementItem[];
+  try {
+    const res = await tablesDB.listRows({
+      databaseId: DATABASE_ID,
+      tableId: "movimientos",
+      queries: [Query.orderDesc("fecha"), Query.limit(100)]
+    });
+    return res.rows as unknown as MovementItem[];
+  } catch (err) {
+    console.error("Error fetching movimientos:", err);
+    return [];
+  }
 }
 
 export async function fetchRecargas(): Promise<RecargaItem[]> {
