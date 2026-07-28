@@ -723,7 +723,43 @@ export default function Home() {
                   const yearlySales = salesList.filter((sale) => new Date(sale.fecha || Date.now()).getFullYear() === chartYear).reduce((acc, sale) => acc + (sale.total || 0), 0);
                   const yearlyExpenses = gastosList.filter((gasto) => new Date(gasto.fecha || Date.now()).getFullYear() === chartYear).reduce((acc, gasto) => acc + (gasto.monto || 0), 0);
                   const yearlyProfit = (yearlySales * 0.15) - yearlyExpenses;
-                  return <div className="year-result"><span>Ganancia estimada del {"a\u00f1o"} {chartYear}</span><strong>S/ {yearlyProfit.toFixed(2)}</strong></div>;
+                  const monthShort = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+                  return (
+                    <div className="year-result-container">
+                      <div className="year-result-main">
+                        <div>
+                          <span>Ganancia estimada del {"a\u00f1o"} {chartYear}</span>
+                          <strong>S/ {yearlyProfit.toFixed(2)}</strong>
+                        </div>
+                        <div className="year-result-stat">
+                          <span>Ventas Totales</span>
+                          <b>S/ {yearlySales.toFixed(2)}</b>
+                        </div>
+                      </div>
+
+                      <div className="months-grid-inline">
+                        <div className="months-grid-header">Ventas por meses ({chartYear})</div>
+                        <div className="months-pills">
+                          {monthShort.map((mLabel, mIdx) => {
+                            const mTotal = salesList
+                              .filter((s) => {
+                                const d = new Date(s.fecha || Date.now());
+                                return d.getFullYear() === chartYear && d.getMonth() === mIdx;
+                              })
+                              .reduce((acc, curr) => acc + (curr.total || 0), 0);
+                            const hasSales = mTotal > 0;
+                            return (
+                              <div className={`month-pill ${hasSales ? "has-sales" : ""}`} key={mLabel}>
+                                <span className="m-name">{mLabel}</span>
+                                <span className="m-val">S/ {mTotal >= 1000 ? `${(mTotal / 1000).toFixed(1)}k` : mTotal.toFixed(0)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
                 })()}
               </div>
               {showMonthlySummary && range === "Anio" ? <aside className="monthly-result-panel">

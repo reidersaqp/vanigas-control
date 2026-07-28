@@ -1587,13 +1587,24 @@ tr:hover td {
   font-size: 0.62rem;
 }
 
-.year-result {
+.year-result-container {
   border-top: var(--rule-thin) solid var(--color-rule);
-  padding-top: var(--space-sm);
+  padding-top: var(--space-md);
+  margin-top: var(--space-xs);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
 }
 
-.year-result span,
-.monthly-result-panel h4 {
+.year-result-main {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-lg);
+}
+
+.year-result-main span {
   display: block;
   margin: 0 0 var(--space-3xs);
   color: var(--color-muted);
@@ -1603,13 +1614,85 @@ tr:hover td {
   letter-spacing: 0.04em;
 }
 
-.year-result strong {
+.year-result-main strong {
   display: block;
   color: var(--color-ink);
   font-family: var(--font-display);
   font-size: var(--text-2xl);
   font-weight: 900;
   line-height: 1;
+}
+
+.year-result-stat {
+  padding-left: var(--space-md);
+  border-left: var(--rule-thin) solid var(--color-rule);
+}
+
+.year-result-stat b {
+  display: block;
+  color: var(--color-ink);
+  font-size: var(--text-md);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.months-grid-inline {
+  flex: 1;
+  min-width: 280px;
+}
+
+.months-grid-header {
+  font-size: var(--text-3xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin-bottom: 4px;
+  letter-spacing: 0.04em;
+}
+
+.months-pills {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.month-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 6px;
+  background: var(--color-paper-2);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-xs);
+  min-width: 36px;
+  text-align: center;
+}
+
+.month-pill.has-sales {
+  background: oklch(96% 0.03 25.13);
+  border-color: oklch(75% 0.15 25.13);
+}
+
+.month-pill .m-name {
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: var(--color-muted);
+  line-height: 1;
+}
+
+.month-pill.has-sales .m-name {
+  color: oklch(48% 0.18 25.13);
+}
+
+.month-pill .m-val {
+  font-size: 0.65rem;
+  font-weight: 900;
+  color: var(--color-ink);
+  line-height: 1.2;
+}
+
+.month-pill.has-sales .m-val {
+  color: oklch(48% 0.18 25.13);
 }
 
 .year-result p {
