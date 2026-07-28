@@ -726,21 +726,22 @@ export default function Home() {
                   const monthShort = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
                   return (
-                    <div className="year-result-container">
-                      <div className="year-result-main">
-                        <div>
-                          <span>Ganancia estimada del {"a\u00f1o"} {chartYear}</span>
-                          <strong>S/ {yearlyProfit.toFixed(2)}</strong>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', borderTop: '1px solid var(--color-rule)', paddingTop: '16px', marginTop: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-muted)', textTransform: 'uppercase' }}>Ganancia estimada del {"a\u00f1o"} {chartYear}:</span>
+                          <strong style={{ fontSize: '20px', fontWeight: 900, color: 'var(--color-ink)' }}>S/ {yearlyProfit.toFixed(2)}</strong>
                         </div>
-                        <div className="year-result-stat">
-                          <span>Ventas Totales</span>
-                          <b>S/ {yearlySales.toFixed(2)}</b>
+
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-muted)', textTransform: 'uppercase' }}>Ventas Totales:</span>
+                          <strong style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-ink)' }}>S/ {yearlySales.toFixed(2)}</strong>
                         </div>
                       </div>
 
-                      <div className="months-grid-inline">
-                        <div className="months-grid-header">Ventas por meses ({chartYear})</div>
-                        <div className="months-pills">
+                      <div style={{ width: '100%' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-muted)', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.04em' }}>Ventas por meses ({chartYear})</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                           {monthShort.map((mLabel, mIdx) => {
                             const mTotal = salesList
                               .filter((s) => {
@@ -750,9 +751,25 @@ export default function Home() {
                               .reduce((acc, curr) => acc + (curr.total || 0), 0);
                             const hasSales = mTotal > 0;
                             return (
-                              <div className={`month-pill ${hasSales ? "has-sales" : ""}`} key={mLabel}>
-                                <span className="m-name">{mLabel}</span>
-                                <span className="m-val">S/ {mTotal >= 1000 ? `${(mTotal / 1000).toFixed(1)}k` : mTotal.toFixed(0)}</span>
+                              <div
+                                key={mLabel}
+                                style={{
+                                  display: 'inline-flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: '6px 10px',
+                                  borderRadius: '6px',
+                                  border: '1px solid ' + (hasSales ? '#f87171' : 'var(--color-rule)'),
+                                  background: hasSales ? '#fef2f2' : 'var(--color-paper-2)',
+                                  minWidth: '54px',
+                                  textAlign: 'center'
+                                }}
+                              >
+                                <span style={{ fontSize: '11px', fontWeight: 800, color: hasSales ? '#dc2626' : 'var(--color-muted)' }}>{mLabel}</span>
+                                <span style={{ fontSize: '12px', fontWeight: 900, color: hasSales ? '#dc2626' : 'var(--color-ink)', marginTop: '2px' }}>
+                                  S/ {mTotal >= 1000 ? `${(mTotal / 1000).toFixed(1)}k` : mTotal.toFixed(0)}
+                                </span>
                               </div>
                             );
                           })}
