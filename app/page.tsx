@@ -1068,10 +1068,6 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
             <span>Galones en carro</span>
             <strong>{moduleGalonesEnCarro} unidades</strong>
           </div>
-          <div className="caja-card">
-            <span>Precio proveedor por balon</span>
-            <input className="supplier-price-input" type="number" value={precioProveedorBalon} min="0" step="0.10" onChange={(event) => setPrecioProveedorBalon(Number(event.target.value || 0))} />
-          </div>
           <div className="caja-card highlight">
             <span>Capital en balones</span>
             <strong>S/ {moduleCapitalBalones.toFixed(2)}</strong>
