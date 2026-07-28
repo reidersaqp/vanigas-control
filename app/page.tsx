@@ -1137,7 +1137,166 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
        ) :
        view === "Clientes" ? <div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Dirección</th><th>Tipo</th><th>Precio habitual</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{clients.length === 0 ? <tr><td colSpan={7} style={{textAlign:'center',padding:'24px',color:'#718090'}}>No hay clientes guardados aún. Agregue uno con el botón Registrar cliente.</td></tr> : clients.map((cli, i) => <tr key={cli.$id || i}><td><b>{cli.nombre}</b></td><td>{cli.telefono || "-"}</td><td>{cli.direccion || "Dirección no especificada"}</td><td><span className="pill normal">{cli.tipo_cliente}</span></td><td>S/ {(cli.precio_habitual || 52).toFixed(2)}</td><td><span className="badge">Activo</span></td><td>{cli.$id && onRequestDelete ? <button className="delete-btn" onClick={() => onRequestDelete("cliente", cli.$id!, `el cliente ${cli.nombre}`)}>Eliminar</button> : null}</td></tr>)}</tbody></table></div> :
        view === "Movimientos" ? <div className="table-wrap"><table><thead><tr><th>Fecha</th><th>Tipo movimiento</th><th>Balón</th><th>Estado</th><th>Cantidad</th><th>Observación</th></tr></thead><tbody>{movimientos.length === 0 ? <tr><td colSpan={6} style={{textAlign:'center',padding:'24px',color:'#718090'}}>Sin movimientos registrados aún. Se generarán al realizar ventas o recargas.</td></tr> : movimientos.map((mov, i) => <tr key={mov.$id || i}><td>{mov.fecha ? new Date(mov.fecha).toLocaleString([], { dateStyle:'short', timeStyle:'short' }) : "Hoy"}</td><td><b>{mov.tipo_movimiento}</b></td><td>{mov.tipo_balon}</td><td>{mov.estado_balon}</td><td><b>{mov.cantidad}</b></td><td>{mov.observacion || "Movimiento del sistema"}</td></tr>)}</tbody></table></div> :
-       view === "Recargas" ? <div className="table-wrap"><table><thead><tr><th>Fecha envio</th><th>Tipo balon</th><th>Cant. enviada</th><th>Costo unitario</th><th>Total recarga</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{recargas.length === 0 ? <tr><td colSpan={7} style={{textAlign:'center',padding:'24px',color:'#718090'}}>Sin recargas registradas aun. Registre envios de balones vacios a recarga.</td></tr> : recargas.map((rec, i) => <tr key={rec.$id || i}><td>{rec.fecha_envio ? new Date(rec.fecha_envio).toLocaleDateString() : "Hoy"}</td><td>{rec.tipo_balon}</td><td><b>{rec.cantidad_enviada} balones</b></td><td>S/ {(rec.costo_unitario || 0).toFixed(2)}</td><td><b>S/ {(rec.costo_total || ((rec.cantidad_enviada || 0) * (rec.costo_unitario || 0))).toFixed(2)}</b></td><td><span className={`pill ${rec.estado === "recibida" ? "normal" : "premium"}`}>{rec.estado || "enviada"}</span></td><td><div style={{display:'flex',gap:'6px'}}>{rec.estado !== "recibida" ? <button className="logout-button" style={{background:'#e6f4f1',color:'var(--teal)',fontWeight:800}} onClick={() => onRecepcionar(rec.$id || "", rec.tipo_balon, rec.cantidad_enviada)}>Recepcionar</button> : <span style={{fontSize:'11px',color:'var(--teal)',fontWeight:700}}>Recibidas</span>}{rec.$id && onRequestDelete ? <button className="delete-btn" onClick={() => onRequestDelete("recarga", rec.$id!, `el envio a recarga de ${rec.cantidad_enviada} balones`)}>Eliminar</button> : null}</div></td></tr>)}</tbody></table></div> :
+       view === "Recargas" ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {(() => {
+              const lastRecarga = recargas.length > 0 ? recargas[0] : null;
+              const lastDate = lastRecarga && lastRecarga.fecha_envio ? new Date(lastRecarga.fecha_envio) : null;
+              
+              const salesAcumuladas = sales.filter((s) => {
+                if (!lastDate) return true;
+                const sDate = new Date(s.fecha || Date.now());
+                return sDate >= lastDate;
+              }).reduce((acc, curr) => acc + (curr.total || 0), 0);
+
+              const totalCajaAcumulada = salesAcumuladas > 0 ? salesAcumuladas : (sales.reduce((acc, curr) => acc + (curr.total || 0), 0));
+
+              const vaciosNormal = inventory.find(i => i.tipo_balon === "Normal" && i.estado === "vacío")?.cantidad || 0;
+              const vaciosPremium = inventory.find(i => i.tipo_balon === "Premium" && i.estado === "vacío")?.cantidad || 0;
+              const totalVacios = vaciosNormal + vaciosPremium;
+              const valorizacionVacios = totalVacios * 100;
+
+              const costoRecargaUnitario = precioProveedorBalon || 42.0;
+              const capacidadPresupuesto = Math.floor(totalCajaAcumulada / costoRecargaUnitario);
+              const recomendacionBalones = Math.min(capacidadPresupuesto, totalVacios);
+              const costoTotalRecarga = recomendacionBalones * costoRecargaUnitario;
+              const saldoCajaSobrante = Math.max(0, totalCajaAcumulada - costoTotalRecarga);
+
+              const diasDesdeUltima = lastDate ? Math.max(1, Math.floor((Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24))) : 0;
+
+              return (
+                <div className="panel" style={{ padding: '20px', background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                    <div>
+                      <span style={{ color: 'var(--color-accent)', fontWeight: 800, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block' }}>
+                        PLANIFICACIÓN INTELIGENTE DE COMPRA
+                      </span>
+                      <h3 style={{ margin: '2px 0 0', fontSize: '18px', fontWeight: 800, color: 'var(--color-ink)' }}>
+                        Sugerencia de Recarga a Planta NEWGAS
+                      </h3>
+                    </div>
+                    {lastDate ? (
+                      <span className="pill normal" style={{ fontSize: '11px', padding: '4px 10px' }}>
+                        Última recarga hace {diasDesdeUltima} {diasDesdeUltima === 1 ? 'día' : 'días'} ({lastDate.toLocaleDateString()})
+                      </span>
+                    ) : (
+                      <span className="pill normal" style={{ fontSize: '11px', padding: '4px 10px' }}>
+                        Primer envío de período
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="caja-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+                    <div className="caja-card">
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase' }}>Caja Acumulada (Ventas)</span>
+                      <strong style={{ fontSize: '20px', fontWeight: 900, color: 'var(--color-ink)' }}>S/ {totalCajaAcumulada.toFixed(2)}</strong>
+                      <small style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>Dinero juntado desde la última recarga</small>
+                    </div>
+
+                    <div className="caja-card">
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase' }}>Vacíos Disponibles</span>
+                      <strong style={{ fontSize: '20px', fontWeight: 900, color: 'var(--color-warning)' }}>{totalVacios} envases</strong>
+                      <small style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>Valorizados en S/ {valorizacionVacios.toFixed(2)}</small>
+                    </div>
+
+                    <div className="caja-card highlight" style={{ background: 'oklch(97% 0.02 240)', borderColor: 'oklch(85% 0.05 240)' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-accent)', textTransform: 'uppercase' }}>Sugerencia Compra NEWGAS</span>
+                      <strong style={{ fontSize: '20px', fontWeight: 900, color: 'var(--color-accent)' }}>
+                        {recomendacionBalones > 0 ? `${recomendacionBalones} balones` : "Sin recarga requerida"}
+                      </strong>
+                      <small style={{ fontSize: '11px', color: 'var(--color-ink)', fontWeight: 700, marginTop: '4px' }}>
+                        {recomendacionBalones > 0
+                          ? `Costo S/ ${costoTotalRecarga.toFixed(2)} (${recomendacionBalones} x S/ ${costoRecargaUnitario.toFixed(2)})`
+                          : "Caja o vacíos insuficientes"}
+                      </small>
+                    </div>
+
+                    <div className="caja-card">
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase' }}>Saldo Libre en Caja</span>
+                      <strong style={{ fontSize: '20px', fontWeight: 900, color: 'var(--color-success)' }}>S/ {saldoCajaSobrante.toFixed(2)}</strong>
+                      <small style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>Sobrante tras recargar</small>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                    <button
+                      className="primary"
+                      onClick={() => onAddRecarga()}
+                      style={{ padding: '10px 18px', fontSize: '13px', fontWeight: 800 }}
+                    >
+                      + Registrar Envío a Planta NEWGAS
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha envío</th>
+                    <th>Proveedor</th>
+                    <th>Tipo balón</th>
+                    <th>Cant. enviada</th>
+                    <th>Costo unitario</th>
+                    <th>Total recarga</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recargas.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '24px', color: '#718090' }}>
+                        Sin recargas registradas aún. Registre envíos de balones vacíos a Planta NEWGAS.
+                      </td>
+                    </tr>
+                  ) : (
+                    recargas.map((rec, i) => (
+                      <tr key={rec.$id || i}>
+                        <td>{rec.fecha_envio ? new Date(rec.fecha_envio).toLocaleDateString() : "Hoy"}</td>
+                        <td><b>{rec.proveedor || "Planta NEWGAS"}</b></td>
+                        <td>{rec.tipo_balon}</td>
+                        <td><b>{rec.cantidad_enviada} balones</b></td>
+                        <td>S/ {(rec.costo_unitario || 0).toFixed(2)}</td>
+                        <td><b>S/ {(rec.costo_total || ((rec.cantidad_enviada || 0) * (rec.costo_unitario || 0))).toFixed(2)}</b></td>
+                        <td>
+                          <span className={`pill ${rec.estado === "recibida" ? "normal" : "premium"}`}>
+                            {rec.estado || "enviada"}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            {rec.estado !== "recibida" ? (
+                              <button
+                                className="logout-button"
+                                style={{ background: '#e6f4f1', color: 'var(--teal)', fontWeight: 800 }}
+                                onClick={() => onRecepcionar(rec.$id || "", rec.tipo_balon, rec.cantidad_enviada)}
+                              >
+                                Recepcionar
+                              </button>
+                            ) : (
+                              <span style={{ fontSize: '11px', color: 'var(--teal)', fontWeight: 700 }}>Recibidas</span>
+                            )}
+                            {rec.$id && onRequestDelete ? (
+                              <button
+                                className="delete-btn"
+                                onClick={() => onRequestDelete("recarga", rec.$id!, `el envío a recarga de ${rec.cantidad_enviada} balones`)}
+                              >
+                                Eliminar
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) :
        view === "Caja" ? <div className="caja-view-container"><div className="caja-summary-grid"><div className="caja-card"><span>Ventas en efectivo</span><strong>S/ {totalEfectivo.toFixed(2)}</strong></div><div className="caja-card"><span>Ventas digitales (Yape/Plin)</span><strong>S/ {totalDigital.toFixed(2)}</strong></div><div className="caja-card"><span>Gastos registrados</span><strong style={{color:'#c74e49'}}>S/ {totalGastos.toFixed(2)}</strong></div><div className="caja-card highlight"><span>Saldo en Caja Esperado</span><strong>S/ {(totalEfectivo - totalGastos).toFixed(2)}</strong></div></div><div className="table-wrap" style={{marginTop:'20px'}}><table><thead><tr><th>Concepto</th><th>Categoría</th><th>Monto</th><th>Forma de pago</th><th>Acciones</th></tr></thead><tbody>{gastos.length === 0 ? <tr><td colSpan={5} style={{textAlign:'center',padding:'20px',color:'#81909a'}}>No hay gastos registrados el día de hoy.</td></tr> : gastos.map((g, i) => <tr key={g.$id || i}><td><b>{g.concepto}</b></td><td>{g.categoria}</td><td>S/ {(g.monto || 0).toFixed(2)}</td><td>{g.forma_pago || "Efectivo"}</td><td>{g.$id && onRequestDelete ? <button className="delete-btn" onClick={() => onRequestDelete("gasto", g.$id!, `el gasto ${g.concepto} por S/ ${g.monto}`)}>Eliminar</button> : null}</td></tr>)}</tbody></table></div></div> :
        view === "Reportes" ? <div className="reportes-container"><div className="caja-summary-grid"><div className="caja-card"><span>Ingreso Bruto Total</span><strong>S/ {totalVentas.toFixed(2)}</strong></div><div className="caja-card"><span>Ganancia Estimada</span><strong style={{color:'#1f9d73'}}>S/ {(totalVentas * 0.15 - totalGastos).toFixed(2)}</strong></div><div className="caja-card"><span>Balones Vendidos</span><strong>{sales.reduce((a,b)=>a+(b.cantidad||b.qty||0),0)} unidades</strong></div></div>{driveBackupState !== "idle" ? <div className={`drive-backup-status ${driveBackupState}`}><div><strong>{driveBackupState === "success" ? "Copia guardada" : driveBackupState === "error" ? "No se pudo guardar" : driveBackupState === "saving" ? "Guardando en Drive" : "Conectando Google Drive"}</strong><p>{driveBackupMessage}</p></div>{driveBackupState === "success" ? <span>✓</span> : driveBackupState === "error" ? <span>!</span> : <span className="drive-spinner" />}</div> : null}<div className="module-actions-row drive-actions"><button className="primary drive-save-button" onClick={handleDriveBackup} disabled={driveBackupState === "connecting" || driveBackupState === "saving"}>{driveBackupState === "saving" ? "Guardando..." : driveBackupState === "connecting" ? "Conectando..." : "Guardar copia en Google Drive (.xlsx)"}</button><button className="primary" onClick={handleDownloadPDF}>Descargar Reporte PDF</button><button className="primary" style={{background:'#2670b8'}} onClick={handleExportExcel}>Exportar a Excel</button></div></div> :
        <div className="empty-state"><h3>Módulo {view} sincronizado</h3><p>Información lista en Appwrite.</p></div>}
