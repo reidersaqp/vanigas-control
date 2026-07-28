@@ -249,7 +249,39 @@ export async function fetchMovimientos(): Promise<MovementItem[]> {
       tableId: "movimientos",
       queries: [Query.orderDesc("fecha"), Query.limit(100)]
     });
-    return res.rows as unknown as MovementItem[];
+    let movs = res.rows as unknown as MovementItem[];
+
+    // Sincronización automática de seguridad si la tabla estaba vacía
+    if (movs.length === 0) {
+      try {
+        const salesRes = await tablesDB.listRows({
+          databaseId: DATABASE_ID,
+          tableId: "ventas",
+          queries: [Query.limit(100)]
+        });
+        for (const sale of salesRes.rows as any[]) {
+          await createMovimiento({
+            tipo_movimiento: "Venta",
+            tipo_balon: sale.tipo_balon || "Normal",
+            estado_balon: "lleno",
+            cantidad: sale.cantidad || 1,
+            usuario_id: sale.usuario_id || "sistema",
+            observacion: `Venta a ${sale.cliente_nombre || "Cliente General"}`,
+            fecha: sale.fecha || new Date().toISOString()
+          });
+        }
+        const updatedRes = await tablesDB.listRows({
+          databaseId: DATABASE_ID,
+          tableId: "movimientos",
+          queries: [Query.orderDesc("fecha"), Query.limit(100)]
+        });
+        movs = updatedRes.rows as unknown as MovementItem[];
+      } catch (syncErr) {
+        console.error("Error auto-syncing movimientos:", syncErr);
+      }
+    }
+
+    return movs;
   } catch (err) {
     console.error("Error fetching movimientos:", err);
     return [];
@@ -271,6 +303,7 @@ export async function createVenta(venta: {
   tipo_balon: string;
   cantidad: number;
   precio_unitario: number;
+  total?: number;
   forma_pago: string;
   vacios_recibidos: number;
   usuario_id: string;
@@ -278,8 +311,8 @@ export async function createVenta(venta: {
   telefono?: string;
   ubicacion_url?: string;
 }): Promise<void> {
-  const total = venta.cantidad * venta.precio_unitario;
   const fecha = new Date().toISOString();
+  const total = venta.total || (venta.cantidad * venta.precio_unitario);
   const newId = ID.unique();
 
   await tablesDB.createRow({
@@ -315,7 +348,8 @@ export async function createVenta(venta: {
     cantidad: venta.cantidad,
     usuario_id: venta.usuario_id,
     observacion: `Venta a ${venta.cliente_nombre}`,
-  }).catch(() => {});
+    fecha,
+  });
 }
 
 export async function createGasto(gasto: {
@@ -372,22 +406,30 @@ export async function createMovimiento(movimiento: {
   cantidad: number;
   usuario_id?: string;
   observacion?: string;
+  fecha?: string;
 }): Promise<void> {
-  const fecha = new Date().toISOString();
-  await tablesDB.createRow({
-    databaseId: DATABASE_ID,
-    tableId: "movimientos",
-    rowId: ID.unique(),
-    data: {
-      fecha,
-      tipo_movimiento: movimiento.tipo_movimiento,
-      tipo_balon: movimiento.tipo_balon,
-      estado_balon: movimiento.estado_balon,
-      cantidad: movimiento.cantidad,
-      usuario_id: movimiento.usuario_id || "sistema",
-      observacion: movimiento.observacion || "Operación registrada",
-    }
-  });
+  try {
+    const fecha = movimiento.fecha || new Date().toISOString();
+    const rawUser = movimiento.usuario_id && movimiento.usuario_id.trim();
+    const safeUserId = rawUser ? rawUser.slice(0, 64) : "sistema";
+
+    await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: "movimientos",
+      rowId: ID.unique(),
+      data: {
+        fecha,
+        tipo_movimiento: (movimiento.tipo_movimiento || "Venta").slice(0, 40),
+        tipo_balon: (movimiento.tipo_balon || "Normal").slice(0, 20),
+        estado_balon: (movimiento.estado_balon || "lleno").slice(0, 20),
+        cantidad: Number(movimiento.cantidad || 1),
+        usuario_id: safeUserId,
+        observacion: (movimiento.observacion || "Operación registrada").slice(0, 1000),
+      }
+    });
+  } catch (err) {
+    console.error("Error al crear movimiento:", err);
+  }
 }
 
 export async function createCierreCaja(cierre: {
