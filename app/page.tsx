@@ -1133,19 +1133,37 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
   }
 
   async function handleDriveBackup() {
+    const readJsonResponse = async (response: Response) => {
+      const contentType = response.headers.get("content-type") || "";
+      const text = await response.text();
+
+      if (!contentType.includes("application/json")) {
+        throw new Error(text.includes("<!DOCTYPE")
+          ? "La API local respondi? una p?gina HTML. Reinicia localhost y vuelve a intentar."
+          : text || "La API local no respondi? en formato JSON.");
+      }
+
+      const data = JSON.parse(text || "{}");
+      if (!response.ok) {
+        throw new Error(data?.error || data?.message || "No se pudo completar la operaci?n.");
+      }
+
+      return data;
+    };
+
     try {
       setDriveBackupState("connecting");
-      setDriveBackupMessage("Verificando conexión con Google Drive...");
+      setDriveBackupMessage("Verificando conexi?n con Google Drive...");
 
-      const status = await fetch("/api/google/status").then((res) => res.json());
+      const status = await fetch("/api/google/status").then(readJsonResponse);
       if (!status.connected) {
-        setDriveBackupMessage("Se abrirá Google para autorizar Drive. Luego vuelve y presiona este botón otra vez.");
+        setDriveBackupMessage("Se abrir? Google para autorizar Drive. Luego vuelve y presiona este bot?n otra vez.");
         window.location.href = "/api/google/auth";
         return;
       }
 
       setDriveBackupState("saving");
-      setDriveBackupMessage("Generando archivo Excel y guardándolo directamente en Google Drive...");
+      setDriveBackupMessage("Generando archivo Excel y guard?ndolo directamente en Google Drive...");
 
       const dateStr = new Date().toISOString().split("T")[0];
       const filename = `Backup_VANIGAS_${dateStr}.xlsx`;
@@ -1156,7 +1174,7 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
         body: JSON.stringify({ sales, inventory, gastos, recargas, clients, movimientos })
       });
 
-      const data = await res.json();
+      const data = await readJsonResponse(res);
       if (!data.success) {
         throw new Error(data.error || "Error al conectar con Drive");
       }

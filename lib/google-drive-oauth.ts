@@ -25,16 +25,35 @@ type OAuthCredentials = {
   };
 };
 
+type GoogleTokens = {
+  access_token?: string;
+  refresh_token?: string;
+  scope?: string;
+  token_type?: string;
+  expiry_date?: number;
+};
+
 function getOAuthConfig() {
+  const envClientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const envClientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+
+  if (envClientId && envClientSecret) {
+    return {
+      clientId: envClientId,
+      clientSecret: envClientSecret,
+      redirectUri: process.env.GOOGLE_OAUTH_REDIRECT_URI || "http://localhost:3000/api/google/callback",
+    };
+  }
+
   if (!fs.existsSync(OAUTH_CREDENTIALS_PATH)) {
-    throw new Error("No se encontró el JSON OAuth de Google en Descargas.");
+    throw new Error("No se encontr? el JSON OAuth de Google. En Vercel configura GOOGLE_OAUTH_CLIENT_ID y GOOGLE_OAUTH_CLIENT_SECRET.");
   }
 
   const credentials = JSON.parse(fs.readFileSync(OAUTH_CREDENTIALS_PATH, "utf8")) as OAuthCredentials;
   const config = credentials.web || credentials.installed;
 
   if (!config?.client_id || !config.client_secret) {
-    throw new Error("El JSON de Google no es un cliente OAuth válido.");
+    throw new Error("El JSON de Google no es un cliente OAuth v?lido.");
   }
 
   const redirectUri =
@@ -49,6 +68,27 @@ function getOAuthConfig() {
   };
 }
 
+function getTokenFromEnv(): GoogleTokens | null {
+  if (process.env.GOOGLE_OAUTH_TOKEN_JSON) {
+    return JSON.parse(process.env.GOOGLE_OAUTH_TOKEN_JSON) as GoogleTokens;
+  }
+
+  if (process.env.GOOGLE_OAUTH_REFRESH_TOKEN) {
+    return {
+      refresh_token: process.env.GOOGLE_OAUTH_REFRESH_TOKEN,
+      token_type: "Bearer",
+      scope: GOOGLE_DRIVE_SCOPES.join(" "),
+    };
+  }
+
+  return null;
+}
+
+function getTokenFromFile(): GoogleTokens | null {
+  if (!fs.existsSync(TOKEN_PATH)) return null;
+  return JSON.parse(fs.readFileSync(TOKEN_PATH, "utf8")) as GoogleTokens;
+}
+
 export function getGoogleOAuthClient() {
   const config = getOAuthConfig();
 
@@ -60,20 +100,28 @@ export function getGoogleOAuthClient() {
 }
 
 export function hasGoogleDriveToken() {
-  return fs.existsSync(TOKEN_PATH);
+  return Boolean(getTokenFromEnv() || getTokenFromFile());
 }
 
-export function saveGoogleDriveToken(tokens: unknown) {
-  fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens, null, 2), "utf8");
+export function saveGoogleDriveToken(tokens: GoogleTokens) {
+  const existing = getTokenFromFile() || getTokenFromEnv() || {};
+  const merged = { ...existing, ...tokens };
+  fs.writeFileSync(TOKEN_PATH, JSON.stringify(merged, null, 2), "utf8");
+  return merged;
+}
+
+export function getGoogleDriveToken() {
+  const token = getTokenFromEnv() || getTokenFromFile();
+
+  if (!token) {
+    throw new Error("Google Drive no est? conectado. En localhost autoriza Google; en Vercel configura GOOGLE_OAUTH_REFRESH_TOKEN.");
+  }
+
+  return token;
 }
 
 export function getAuthorizedGoogleOAuthClient() {
   const auth = getGoogleOAuthClient();
-
-  if (!hasGoogleDriveToken()) {
-    throw new Error("Google Drive no está conectado. Primero autoriza tu cuenta Google.");
-  }
-
-  auth.setCredentials(JSON.parse(fs.readFileSync(TOKEN_PATH, "utf8")));
+  auth.setCredentials(getGoogleDriveToken());
   return auth;
 }
