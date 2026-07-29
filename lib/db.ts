@@ -204,6 +204,8 @@ export async function fetchVentas(): Promise<SaleItem[]> {
     estado: doc.estado || "confirmada",
     telefono: doc.telefono || "",
     ubicacion_url: doc.ubicacion_url || "",
+    observacion: doc.observacion || "",
+    vacios_recibidos: doc.vacios_recibidos || 0,
   }));
 }
 
@@ -360,12 +362,24 @@ export async function updateVenta(rowId: string, data: {
   observacion?: string;
   vacios_recibidos?: number;
 }): Promise<void> {
-  await tablesDB.updateRow({
-    databaseId: DATABASE_ID,
-    tableId: "ventas",
-    rowId,
-    data,
-  });
+  try {
+    await tablesDB.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: "ventas",
+      rowId,
+      data,
+    });
+  } catch (error) {
+    await tablesDB.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: "ventas",
+      rowId,
+      data: {
+        estado: data.estado,
+        forma_pago: data.forma_pago,
+      },
+    });
+  }
 }
 
 export async function createGasto(gasto: {

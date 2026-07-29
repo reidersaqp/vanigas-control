@@ -915,6 +915,55 @@ tr:hover td {
   color: #ffffff;
 }
 
+.table-action-button {
+  padding: 5px 10px;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  border: 0;
+  border-radius: 6px;
+  font-size: var(--text-3xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.table-wrap table tbody tr.debt-row > td,
+.table-wrap table tbody tr.debt-row:hover > td {
+  background: #fee2e2 !important;
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  color: #7f1d1d;
+}
+
+.table-wrap table tbody tr.debt-row > td:first-child {
+  border-left: 0;
+}
+
+.debt-cell,
+.debt-note-cell {
+  background: #fee2e2 !important;
+  box-shadow: none;
+  color: #7f1d1d;
+  font-weight: 700;
+}
+
+.debt-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 10px;
+  border: 1px solid #b91c1c;
+  border-radius: 6px;
+  background: #fee2e2;
+  color: #7f1d1d;
+  font-size: var(--text-3xs);
+  font-weight: 800;
+}
+
+.debt-summary-card {
+  background: #fffafa !important;
+  border-color: #e8bebe !important;
+}
+
 .empty-state {
   padding: var(--space-xl) var(--space-md);
   display: flex;

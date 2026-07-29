@@ -8,6 +8,7 @@ import { fetchInventario, fetchVentas, createVenta, updateVenta, deleteVenta, fe
 import { exportToCSV, printPDFReport } from "../lib/export";
 
 type View = "Resumen" | "Inventario" | "Ventas" | "Recargas" | "Movimientos" | "Clientes" | "Caja" | "Reportes";
+const views: View[] = ["Resumen", "Inventario", "Ventas", "Recargas", "Movimientos", "Clientes", "Caja", "Reportes"];
 
 const menu: { label: View; icon: string }[] = [
   { label: "Resumen", icon: "" }, { label: "Inventario", icon: "" },
@@ -53,47 +54,35 @@ function StatCard({ label, value, detail }: { label: string; value: string; deta
 
 function SalesTable({ sales, onRequestDelete, onEditVenta }: { sales: SaleItem[]; onRequestDelete?: (type: "venta", id: string, label: string) => void; onEditVenta?: (sale: SaleItem) => void }) {
   if (sales.length === 0) {
-    return <div className="empty-state"><h3>Sin ventas registradas para esta fecha</h3><p>Las ventas que registre en el sistema aparecerán aquí en tiempo real.</p></div>;
+    return <div className="empty-state"><h3>Sin ventas registradas para esta fecha</h3><p>{"Las ventas que registre en el sistema aparecer\u00e1n aqu\u00ed en tiempo real."}</p></div>;
   }
 
+  const getDebtLabel = (estado?: string) => {
+    if (!estado || estado === "confirmada") return "";
+    if (estado === "debe_pago") return "Debe pagar";
+    if (estado === "debe_balon") return "Debe bal\u00f3n";
+    if (estado === "debe_ambos") return "Debe pago y bal\u00f3n";
+    return "Pendiente";
+  };
+
   return <div className="table-wrap"><table>
-    <thead><tr><th>Venta</th><th>Hora</th><th>Cliente</th><th>Balón</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Pago</th><th>Estado</th><th>Observaciones</th>{(onRequestDelete || onEditVenta) ? <th>Acciones</th> : null}</tr></thead>
+    <thead><tr><th>Venta</th><th>Hora</th><th>Cliente</th><th>{"Bal\u00f3n"}</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Pago</th><th>Estado</th><th>Observaciones</th>{(onRequestDelete || onEditVenta) ? <th>Acciones</th> : null}</tr></thead>
     <tbody>{sales.map((sale, idx) => {
-      const isDebt = sale.estado && sale.estado !== "confirmada";
-      return <tr key={sale.$id || sale.id || idx} style={isDebt ? { background: "#fff5f5", borderLeft: "4px solid #ef4444" } : {}}>
+      const isDebt = Boolean(sale.estado && sale.estado !== "confirmada");
+      return <tr key={sale.$id || sale.id || idx} className={isDebt ? "debt-row" : ""}>
         <td className="code">{sale.id || sale.$id?.slice(-6).toUpperCase()}</td>
         <td>{sale.time || "Ahora"}</td>
         <td className="customer"><b>{sale.client || sale.cliente_nombre}</b></td>
         <td><span className={`pill ${(sale.tipo_balon || sale.type) === "Premium" ? "premium" : "normal"}`}>{sale.tipo_balon || sale.type}</span></td>
         <td><b>{sale.cantidad || sale.qty}</b></td>
         <td>S/ {(sale.precio_unitario || sale.price || 0).toFixed(2)}</td>
-        <td className="total" style={isDebt ? { color: "#dc2626", fontWeight: 800 } : {}}>S/ {(sale.total || 0).toFixed(2)}</td>
+        <td className="total">S/ {(sale.total || 0).toFixed(2)}</td>
         <td><span className={`pill ${sale.forma_pago === "Por definir" ? "muted" : "normal"}`}>{sale.forma_pago || sale.payment || "Efectivo"}</span></td>
-        <td>
-          <span style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "4px",
-            padding: "4px 10px",
-            borderRadius: "6px",
-            fontSize: "12px",
-            fontWeight: 800,
-            border: "1px solid",
-            background: (!sale.estado || sale.estado === "confirmada") ? "#e6f4ea" : "#fee2e2",
-            color: (!sale.estado || sale.estado === "confirmada") ? "#137333" : "#991b1b",
-            borderColor: (!sale.estado || sale.estado === "confirmada") ? "#c3e6cb" : "#fca5a5"
-          }}>
-            {(!sale.estado || sale.estado === "confirmada") ? "✓ Completo" :
-             sale.estado === "debe_pago" ? "⚠️ Debe pagar" :
-             sale.estado === "debe_balon" ? "🎈 Debe balón" : "🚨 Debe ambos (S/ + Balón)"}
-          </span>
-        </td>
-        <td style={{ fontSize: "12px", color: sale.observacion ? "#0f172a" : "#94a3b8", fontStyle: sale.observacion ? "normal" : "italic" }}>
-          {sale.observacion || "Sin notas"}
-        </td>
+        <td className={isDebt ? "debt-cell" : ""}>{isDebt ? <span className="debt-badge">{getDebtLabel(sale.estado)}</span> : null}</td>
+        <td className={isDebt ? "debt-note-cell" : ""}>{sale.observacion || ""}</td>
         {(onRequestDelete || onEditVenta) ? <td>
           <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-            {onEditVenta ? <button style={{ padding: "5px 10px", background: "#0f172a", color: "#fff", border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }} onClick={() => onEditVenta(sale)}>Editar</button> : null}
+            {onEditVenta ? <button className="table-action-button" onClick={() => onEditVenta(sale)}>Editar</button> : null}
             {onRequestDelete && sale.$id ? <button className="delete-btn" onClick={() => onRequestDelete("venta", sale.$id!, `la venta por S/ ${(sale.total || 0).toFixed(2)}`)}>Eliminar</button> : null}
           </div>
         </td> : null}
@@ -193,12 +182,23 @@ export default function Home() {
     role: "Administrador",
   });
   const [checkingSession, setCheckingSession] = useState(true);
-  const [view, setView] = useState<View>("Resumen");
+  const [view, setView] = useState<View>(() => {
+    if (typeof window === "undefined") return "Resumen";
+    const savedView = window.localStorage.getItem("vanigas:view") as View | null;
+    return savedView && views.includes(savedView) ? savedView : "Resumen";
+  });
   const [range, setRange] = useState("Hoy");
   const [chartYear, setChartYear] = useState(new Date().getFullYear());
   const [showMonthlySummary, setShowMonthlySummary] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(getTodayDateKey());
-  const [capitalObjetivo, setCapitalObjetivo] = useState(5000);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    if (typeof window === "undefined") return getTodayDateKey();
+    return window.localStorage.getItem("vanigas:selectedDate") || getTodayDateKey();
+  });
+  const [capitalObjetivo, setCapitalObjetivo] = useState(() => {
+    if (typeof window === "undefined") return 0;
+    const savedCapital = Number(window.localStorage.getItem("vanigas:capitalObjetivo"));
+    return Number.isFinite(savedCapital) ? savedCapital : 0;
+  });
   const [precioProveedorBalon, setPrecioProveedorBalon] = useState(44.30);
   const [modal, setModal] = useState(false);
   const [gastoModal, setGastoModal] = useState(false);
@@ -277,16 +277,29 @@ export default function Home() {
   async function handleSaveEditVenta(e: FormEvent) {
     e.preventDefault();
     if (!editingSale?.$id) return;
+    const saleId = editingSale.$id;
+    const changes = {
+      estado: editEstado,
+      forma_pago: editFormaPago,
+      payment: editFormaPago,
+      observacion: editObservacion,
+      vacios_recibidos: Number(editVacios),
+    };
     setSavingEditVenta(true);
+    setSalesList((items) =>
+      items.map((item) =>
+        item.$id === saleId ? { ...item, ...changes } : item
+      )
+    );
+    setEditingSale(null);
     try {
-      await updateVenta(editingSale.$id, {
+      await updateVenta(saleId, {
         estado: editEstado,
         forma_pago: editFormaPago,
         observacion: editObservacion,
         vacios_recibidos: Number(editVacios),
       });
       await loadAppwriteContent();
-      setEditingSale(null);
     } catch (err) {
       console.error("Error al editar venta:", err);
     } finally {
@@ -298,6 +311,18 @@ export default function Home() {
 
   const currentDateStr = useMemo(() => formatDateLabel(selectedDate), [selectedDate]);
   const isTodaySelected = selectedDate === getTodayDateKey();
+
+  useEffect(() => {
+    window.localStorage.setItem("vanigas:view", view);
+  }, [view]);
+
+  useEffect(() => {
+    window.localStorage.setItem("vanigas:selectedDate", selectedDate);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    window.localStorage.setItem("vanigas:capitalObjetivo", String(capitalObjetivo || 0));
+  }, [capitalObjetivo]);
 
   useEffect(() => {
     account.get()
@@ -634,7 +659,7 @@ export default function Home() {
   const inventarioBruto = galonesLlenos + galonesVacios + galonesEnCarro;
   const capitalActualBalones = inventarioBruto * costoBaseBalon;
   const capitalFaltante = Math.max(0, capitalObjetivo - capitalActualBalones);
-  const balonesFaltantesCapital = Math.ceil(capitalFaltante / costoBaseBalon);
+  const balonesFaltantesCapital = costoBaseBalon > 0 ? Math.ceil(capitalFaltante / costoBaseBalon) : 0;
   const galonesRestantesCarro = Math.max(0, galonesEnCarro - totalBalonesHoy);
 
   return <main className="app-shell" onFocusCapture={handleClearZeroOnFocus} onKeyDownCapture={handleClearZeroOnKeyDown} onInputCapture={handleCleanLeadingZeroOnInput}>
@@ -884,7 +909,7 @@ export default function Home() {
         const selected = clientsList.find(c => c.nombre === e.target.value);
         setSaleClient(e.target.value);
         if (selected && selected.telefono) setSaleTelefono(selected.telefono);
-      }}><option value="">-- Seleccionar o escribir cliente --</option>{clientsList.map(c => <option key={c.nombre} value={c.nombre}>{c.nombre} ({c.tipo_cliente})</option>)}</select> : null}<input type="text" placeholder="Escribir nombre de cliente" value={saleClient} onChange={(e)=>setSaleClient(e.target.value)} required /></label><label>Teléfono<input type="text" placeholder="Ej. 987654321" value={saleTelefono} onChange={(e)=>setSaleTelefono(e.target.value)} /></label><label>Enlace de Ubicación GPS<input type="text" placeholder="Ej. https://maps.google.com/..." value={saleUbicacionUrl} onChange={(e)=>setSaleUbicacionUrl(e.target.value)} /></label><label>Tipo de cliente<select value={saleClientType} onChange={(e)=>setSaleClientType(e.target.value)}><option value="Restaurante">Restaurante</option><option value="Negocio">Negocio</option><option value="Domicilio">Domicilio</option></select></label><label>Tipo de balón<select value={saleType} onChange={(e)=>{ setSaleType(e.target.value); setSalePrice(e.target.value === "Premium" ? 55 : 52); }}><option value="Normal">Normal</option><option value="Premium">Premium</option></select></label><label>Cantidad<input type="number" value={saleQty} onChange={(e)=>{ const val = Number(e.target.value); setSaleQty(val); setSaleVacios(val); }} min="1" required /></label><label>Balones vacíos recibidos<input type="number" value={saleVacios} onChange={(e)=>setSaleVacios(Number(e.target.value))} min="0" required /></label><label>Precio unitario (S/)<input type="number" value={salePrice} onChange={(e)=>setSalePrice(Number(e.target.value))} step="0.5" required /></label><label>Forma de pago<select value={salePayment} onChange={(e)=>setSalePayment(e.target.value)}><option value="Por definir">Por definir (En entrega)</option><option value="Efectivo">Efectivo</option><option value="Yape">Yape / Plin</option><option value="Transferencia">Transferencia</option><option value="Crédito">Crédito</option></select></label><label>Estado de entrega<select value={saleEstado} onChange={(e)=>setSaleEstado(e.target.value)}><option value="pendiente">Pendiente (Por entregar)</option><option value="confirmada">Completo (Entregado y cobrado)</option><option value="debe_pago">Debe pagar</option><option value="debe_balon">Debe balón</option><option value="debe_ambos">Debe ambos</option></select></label></div><div className="sale-total"><span>Total de la venta</span><strong>S/ {(saleQty * salePrice).toFixed(2)}</strong></div><div className="modal-actions"><button type="button" onClick={()=>setModal(false)}>Cancelar</button><button type="submit" className="primary" disabled={savingSale}>{savingSale ? "Guardando…" : "Guardar venta"}</button></div></form></section></div>}
+      }}><option value="">-- Seleccionar o escribir cliente --</option>{clientsList.map(c => <option key={c.nombre} value={c.nombre}>{c.nombre} ({c.tipo_cliente})</option>)}</select> : null}<input type="text" placeholder="Escribir nombre de cliente" value={saleClient} onChange={(e)=>setSaleClient(e.target.value)} required /></label><label>Teléfono<input type="text" placeholder="Ej. 987654321" value={saleTelefono} onChange={(e)=>setSaleTelefono(e.target.value)} /></label><label>Enlace de Ubicación GPS<input type="text" placeholder="Ej. https://maps.google.com/..." value={saleUbicacionUrl} onChange={(e)=>setSaleUbicacionUrl(e.target.value)} /></label><label>Tipo de cliente<select value={saleClientType} onChange={(e)=>setSaleClientType(e.target.value)}><option value="Restaurante">Restaurante</option><option value="Negocio">Negocio</option><option value="Domicilio">Domicilio</option></select></label><label>Tipo de balón<select value={saleType} onChange={(e)=>{ setSaleType(e.target.value); setSalePrice(e.target.value === "Premium" ? 55 : 52); }}><option value="Normal">Normal</option><option value="Premium">Premium</option></select></label><label>Cantidad<input type="number" value={saleQty} onChange={(e)=>{ const val = Number(e.target.value); setSaleQty(val); setSaleVacios(val); }} min="1" required /></label><label>Balones vacíos recibidos<input type="number" value={saleVacios} onChange={(e)=>setSaleVacios(Number(e.target.value))} min="0" required /></label><label>Precio unitario (S/)<input type="number" value={salePrice} onChange={(e)=>setSalePrice(Number(e.target.value))} step="0.5" required /></label><label>Forma de pago<select value={salePayment} onChange={(e)=>setSalePayment(e.target.value)}><option value="Por definir">Por definir (En entrega)</option><option value="Efectivo">Efectivo</option><option value="Yape">Yape / Plin</option><option value="Transferencia">Transferencia</option><option value={"Cr\u00e9dito"}>{"Cr\u00e9dito"}</option></select></label><label>Estado de entrega<select value={saleEstado} onChange={(e)=>setSaleEstado(e.target.value)}><option value="pendiente">Pendiente (Por entregar)</option><option value="confirmada">Completo (Entregado y cobrado)</option><option value="debe_pago">Debe pagar</option><option value="debe_balon">Debe balón</option><option value="debe_ambos">Debe ambos</option></select></label></div><div className="sale-total"><span>Total de la venta</span><strong>S/ {(saleQty * salePrice).toFixed(2)}</strong></div><div className="modal-actions"><button type="button" onClick={()=>setModal(false)}>Cancelar</button><button type="submit" className="primary" disabled={savingSale}>{savingSale ? "Guardando…" : "Guardar venta"}</button></div></form></section></div>}
 
     {clienteModal && <div className="modal-backdrop" onMouseDown={() => setClienteModal(false)}><section className="modal" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setClienteModal(false)}>×</button><span className="eyebrow">NUEVO CLIENTE</span><h2>Registrar cliente</h2><form onSubmit={handleSaveCliente}><div className="form-grid"><label>Nombre del cliente / Empresa<input type="text" placeholder="Ej. Cevichería El Sabor" value={cliNombre} onChange={(e)=>setCliNombre(e.target.value)} required /></label><label>Teléfono<input type="text" placeholder="Ej. 987654321" value={cliTelefono} onChange={(e)=>setCliTelefono(e.target.value)} /></label><label>Dirección<input type="text" placeholder="Ej. Av. Principal 123" value={cliDireccion} onChange={(e)=>setCliDireccion(e.target.value)} /></label><label>Tipo de cliente<select value={cliTipo} onChange={(e)=>setCliTipo(e.target.value)}><option value="Restaurante">Restaurante</option><option value="Negocio">Negocio</option><option value="Domicilio">Domicilio</option></select></label><label>Precio habitual (S/)<input type="number" value={cliPrecioHabitual} onChange={(e)=>setCliPrecioHabitual(Number(e.target.value))} step="0.5" required /></label></div><div className="modal-actions"><button type="button" onClick={()=>setClienteModal(false)}>Cancelar</button><button type="submit" className="primary" disabled={savingCliente}>{savingCliente ? "Guardando cliente…" : "Guardar cliente"}</button></div></form></section></div>}
 
@@ -917,12 +942,13 @@ export default function Home() {
           </p>
           <form onSubmit={handleSaveEditVenta}>
             <div className="form-grid">
-              <label>Estado de Cobro / Deuda
+              <label>Estado de cobro / deuda
                 <select value={editEstado} onChange={(e) => setEditEstado(e.target.value)}>
-                  <option value="confirmada">✓ Completo (Pagó y devolvió vacío)</option>
-                  <option value="debe_pago">⚠️ Debe pagar (Dinero pendiente)</option>
-                  <option value="debe_balon">🎈 Debe balón (Envase pendiente)</option>
-                  <option value="debe_ambos">🚨 Debe ambos (Dinero y balón pendiente)</option>
+                  <option value="pendiente">Pendiente: por entregar</option>
+                  <option value="confirmada">{"Completo: pag\u00f3 y devolvi\u00f3 vac\u00edo"}</option>
+                  <option value="debe_pago">Debe pagar: dinero pendiente</option>
+                  <option value="debe_balon">{"Debe bal\u00f3n: envase pendiente"}</option>
+                  <option value="debe_ambos">{"Debe pago y bal\u00f3n pendiente"}</option>
                 </select>
               </label>
 
@@ -1201,35 +1227,35 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div className="caja-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
             <div className="caja-card">
-              <span>Total Ventas Hoy</span>
+              <span>Total ventas hoy</span>
               <strong style={{ color: 'var(--color-ink)' }}>S/ {totalVentas.toFixed(2)}</strong>
               <small style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>{sales.length} ventas procesadas</small>
             </div>
-            <div className="caja-card" style={{ background: modVentasDeudorasSoles > 0 ? '#fef2f2' : 'var(--color-paper)', borderColor: modVentasDeudorasSoles > 0 ? '#fca5a5' : 'var(--color-rule)' }}>
-              <span>Por Cobrar (Dinero)</span>
-              <strong style={{ color: modVentasDeudorasSoles > 0 ? '#dc2626' : 'var(--color-success)' }}>
+            <div className={`caja-card ${modVentasDeudorasSoles > 0 ? "debt-summary-card" : ""}`}>
+              <span>Por cobrar</span>
+              <strong style={{ color: modVentasDeudorasSoles > 0 ? '#b91c1c' : 'var(--color-ink)' }}>
                 S/ {modVentasDeudorasSoles.toFixed(2)}
               </strong>
-              <small style={{ fontSize: '11px', color: modVentasDeudorasSoles > 0 ? '#991b1b' : 'var(--color-muted)', marginTop: '4px' }}>
-                {modSalesDeudorasPago.length} ventas pendientes de pago
+              <small style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                {modVentasDeudorasSoles > 0 ? `${modSalesDeudorasPago.length} ventas pendientes de pago` : ""}
               </small>
             </div>
-            <div className="caja-card" style={{ background: modVentasDeudorasBalones > 0 ? '#fef2f2' : 'var(--color-paper)', borderColor: modVentasDeudorasBalones > 0 ? '#fca5a5' : 'var(--color-rule)' }}>
-              <span>Balones por Devolver</span>
-              <strong style={{ color: modVentasDeudorasBalones > 0 ? '#dc2626' : 'var(--color-success)' }}>
+            <div className={`caja-card ${modVentasDeudorasBalones > 0 ? "debt-summary-card" : ""}`}>
+              <span>Balones por devolver</span>
+              <strong style={{ color: modVentasDeudorasBalones > 0 ? '#b91c1c' : 'var(--color-ink)' }}>
                 {modVentasDeudorasBalones} balones
               </strong>
-              <small style={{ fontSize: '11px', color: modVentasDeudorasBalones > 0 ? '#991b1b' : 'var(--color-muted)', marginTop: '4px' }}>
-                Envases pendientes en clientes
+              <small style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                {modVentasDeudorasBalones > 0 ? "Envases pendientes en clientes" : ""}
               </small>
             </div>
-            <div className="caja-card highlight" style={{ background: modTotalDeudorasCount > 0 ? '#fee2e2' : 'var(--color-paper)', borderColor: modTotalDeudorasCount > 0 ? '#ef4444' : 'var(--color-accent)' }}>
-              <span>Ventas Deudoras Totales</span>
-              <strong style={{ color: modTotalDeudorasCount > 0 ? '#991b1b' : 'var(--color-accent)', fontSize: '20px' }}>
-                {modTotalDeudorasCount} deudoras
+            <div className={`caja-card ${modTotalDeudorasCount > 0 ? "debt-summary-card" : ""}`}>
+              <span>Ventas con deuda</span>
+              <strong style={{ color: modTotalDeudorasCount > 0 ? '#b91c1c' : 'var(--color-ink)', fontSize: '20px' }}>
+                {modTotalDeudorasCount} {modTotalDeudorasCount === 1 ? "deuda" : "deudas"}
               </strong>
-              <small style={{ fontSize: '11px', color: modTotalDeudorasCount > 0 ? '#7f1d1d' : 'var(--color-muted)', marginTop: '4px' }}>
-                {modTotalDeudorasCount > 0 ? "⚠️ Cobros o envases pendientes" : "✓ Todas las ventas al día"}
+              <small style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                {modTotalDeudorasCount > 0 ? "Cobros o envases pendientes" : ""}
               </small>
             </div>
           </div>
