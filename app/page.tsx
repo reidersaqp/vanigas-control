@@ -1139,8 +1139,8 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
 
       if (!contentType.includes("application/json")) {
         throw new Error(text.includes("<!DOCTYPE")
-          ? "La API local respondi? una p?gina HTML. Reinicia localhost y vuelve a intentar."
-          : text || "La API local no respondi? en formato JSON.");
+          ? "La API respondió una página HTML. Revisa el despliegue de Vercel y vuelve a intentar."
+          : text || "La API no respondió en formato JSON.");
       }
 
       const data = JSON.parse(text || "{}");
