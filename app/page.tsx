@@ -1037,8 +1037,7 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
 
     {view === "Inventario" ? (
       <>
-
-        <div className="caja-summary-grid" style={{marginBottom: '20px'}}>
+        <div className="caja-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '14px', marginBottom: '20px' }}>
           <div className="caja-card">
             <span>Galones llenos</span>
             <strong style={{color: 'var(--color-success)'}}>{moduleGalonesLlenos} unidades</strong>
@@ -1057,7 +1056,12 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
           <div className="caja-card highlight">
             <span>Inventario Bruto Total</span>
             <strong style={{color: 'var(--color-accent)'}}>{moduleInventarioBruto} balones</strong>
-            <small style={{fontSize: '11px', color: 'var(--color-ink)', fontWeight: 700, marginTop: '4px'}}>Inversión Carga: S/ {moduleCapitalBalones.toFixed(2)}</small>
+            <small style={{fontSize: '11px', color: 'var(--color-ink)', marginTop: '4px'}}>Llenos + Vacíos + Carro</small>
+          </div>
+          <div className="caja-card highlight" style={{background: 'var(--color-surface)', borderColor: 'var(--color-accent)'}}>
+            <span>Capital en Stock (Gas)</span>
+            <strong style={{color: 'var(--color-accent)', fontSize: '20px'}}>S/ {moduleCapitalBalones.toFixed(2)}</strong>
+            <small style={{fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px'}}>S/ {moduleCostoBaseBalon.toFixed(2)} c/u (Planta NEWGAS)</small>
           </div>
         </div>
       </>
@@ -1083,49 +1087,44 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
                <div className="inv-img-wrap"><img src="/balon_gas.png" alt="Galones llenos" className="stock-img" /></div>
                <div className="inv-info"><h4>Galones llenos</h4><span className="pill normal">LISTOS PARA VENTA</span></div>
              </div>
-             <label className="stock-edit-field">Cantidad actual
+             <label className="stock-edit-field">Editar cantidad
                <input type="number" value={draftGalonesLlenos} min="0" onChange={(event) => setDraftGalonesLlenos(Number(event.target.value || 0))} />
              </label>
              <button className="stock-save-button" disabled={savingAggregateStock === "lleno"} onClick={async () => { setSavingAggregateStock("lleno"); try { await onSetAggregateStock("lleno", draftGalonesLlenos); } finally { setSavingAggregateStock(null); } }}>{savingAggregateStock === "lleno" ? "Guardando..." : "Guardar llenos"}</button>
-             <div className="inv-card-body"><strong className="inv-qty">{moduleGalonesLlenos}</strong><span>unidades fisicas disponibles</span></div>
            </article>
            <article className="inventory-card aggregate-card editable-stock-card">
              <div className="inv-card-head">
-               <div className="inv-img-wrap"><img src="/balon_gas.png" alt="Galones vacios" className="stock-img muted" /></div>
-               <div className="inv-info"><h4>Galones vacios</h4><span className="pill premium">PARA RECARGA</span></div>
+               <div className="inv-img-wrap"><img src="/balon_gas.png" alt="Galones vacíos" className="stock-img muted" /></div>
+               <div className="inv-info"><h4>Galones vacíos</h4><span className="pill premium">PARA RECARGA</span></div>
              </div>
-             <label className="stock-edit-field">Cantidad actual
+             <label className="stock-edit-field">Editar cantidad
                <input type="number" value={draftGalonesVacios} min="0" onChange={(event) => setDraftGalonesVacios(Number(event.target.value || 0))} />
              </label>
-             <button className="stock-save-button" disabled={savingAggregateStock === "vac\u00edo"} onClick={async () => { setSavingAggregateStock("vac\u00edo"); try { await onSetAggregateStock("vac\u00edo", draftGalonesVacios); } finally { setSavingAggregateStock(null); } }}>{savingAggregateStock === "vac\u00edo" ? "Guardando..." : "Guardar vacios"}</button>
-             <div className="inv-card-body"><strong className="inv-qty">{moduleGalonesVacios}</strong><span>unidades fisicas en almacen</span></div>
+             <button className="stock-save-button" disabled={savingAggregateStock === "vac\u00edo"} onClick={async () => { setSavingAggregateStock("vac\u00edo"); try { await onSetAggregateStock("vac\u00edo", draftGalonesVacios); } finally { setSavingAggregateStock(null); } }}>{savingAggregateStock === "vac\u00edo" ? "Guardando..." : "Guardar vacíos"}</button>
            </article>
            <article className="inventory-card aggregate-card editable-stock-card">
              <div className="inv-card-head">
                <div className="inv-img-wrap"><img src="/carro.png" alt="Galones en carro" className="stock-img premium" /></div>
-               <div className="inv-info"><h4>Galones en carro</h4><span className="pill normal">REPARTO DEL DIA</span></div>
+               <div className="inv-info"><h4>Galones en carro</h4><span className="pill normal">REPARTO DEL DÍA</span></div>
              </div>
-             <label className="stock-edit-field">Cantidad actual
+             <label className="stock-edit-field">Editar cantidad
                <input type="text" value={galonesChofer} onChange={(event) => { const val = event.target.value; if (val === "" || /^\d+$/.test(val)) setGalonesChofer(val); }} placeholder="0" />
              </label>
              <button className="stock-save-button" disabled={savingGalones} onClick={async () => { setSavingGalones(true); try { await saveGalonesHoy(Number(galonesChofer || 0)); } finally { setSavingGalones(false); } }}>{savingGalones ? "Guardando..." : "Guardar carro"}</button>
-             <div className="inv-card-body"><strong className="inv-qty">{moduleGalonesEnCarro}</strong><span>carga registrada para el chofer</span></div>
            </article>
            <article className="inventory-card aggregate-card capital-card">
               <div className="inv-card-head">
-                <div className="inv-info"><h4>Inventario Bruto Total</h4><span className="pill normal">TODOS LOS BALONES</span></div>
+                <div className="inv-info"><h4>Precio proveedor</h4><span className="pill normal">PLANTA NEWGAS</span></div>
               </div>
-              <label className="stock-edit-field">Costo recarga proveedor (S/)
+              <label className="stock-edit-field">Costo recarga por balón (S/)
                 <input type="number" value={precioProveedorBalon} min="0" step="0.10" onChange={(event) => setPrecioProveedorBalon(Number(event.target.value || 0))} />
               </label>
-              <div className="inv-card-body">
-                <strong className="inv-qty">{moduleInventarioBruto} balones</strong>
-                <span style={{display:'block',marginTop:'4px',fontSize:'12px',color:'var(--color-muted)'}}>Llenos ({moduleGalonesLlenos}) + Vacíos ({moduleGalonesVacios}) + Carro ({moduleGalonesEnCarro})</span>
-                <span style={{display:'block',marginTop:'6px',fontWeight:800,color:'var(--color-accent)',fontSize:'13px'}}>Capital en Stock: S/ {moduleCapitalBalones.toFixed(2)}</span>
+              <div className="inv-card-body" style={{marginTop:'10px'}}>
+                <span style={{fontSize:'12px',color:'var(--color-muted)'}}>Costo unitario de recarga en Planta NEWGAS</span>
               </div>
-           </article>
-         </div>
-       ) :
+            </article>
+          </div>
+        ) :
        view === "Clientes" ? <div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Dirección</th><th>Tipo</th><th>Precio habitual</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{clients.length === 0 ? <tr><td colSpan={7} style={{textAlign:'center',padding:'24px',color:'#718090'}}>No hay clientes guardados aún. Agregue uno con el botón Registrar cliente.</td></tr> : clients.map((cli, i) => <tr key={cli.$id || i}><td><b>{cli.nombre}</b></td><td>{cli.telefono || "-"}</td><td>{cli.direccion || "Dirección no especificada"}</td><td><span className="pill normal">{cli.tipo_cliente}</span></td><td>S/ {(cli.precio_habitual || 52).toFixed(2)}</td><td><span className="badge">Activo</span></td><td>{cli.$id && onRequestDelete ? <button className="delete-btn" onClick={() => onRequestDelete("cliente", cli.$id!, `el cliente ${cli.nombre}`)}>Eliminar</button> : null}</td></tr>)}</tbody></table></div> :
        view === "Movimientos" ? <div className="table-wrap"><table><thead><tr><th>Fecha</th><th>Tipo movimiento</th><th>Balón</th><th>Estado</th><th>Cantidad</th><th>Observación</th></tr></thead><tbody>{movimientos.length === 0 ? <tr><td colSpan={6} style={{textAlign:'center',padding:'24px',color:'#718090'}}>Sin movimientos registrados aún. Se generarán al realizar ventas o recargas.</td></tr> : movimientos.map((mov, i) => <tr key={mov.$id || i}><td>{mov.fecha ? new Date(mov.fecha).toLocaleString([], { dateStyle:'short', timeStyle:'short' }) : "Hoy"}</td><td><b>{mov.tipo_movimiento}</b></td><td>{mov.tipo_balon}</td><td>{mov.estado_balon}</td><td><b>{mov.cantidad}</b></td><td>{mov.observacion || "Movimiento del sistema"}</td></tr>)}</tbody></table></div> :
        view === "Recargas" ? (
