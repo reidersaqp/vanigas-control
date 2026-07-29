@@ -12,7 +12,7 @@ type View = "Resumen" | "Inventario" | "Ventas" | "Recargas" | "Movimientos" | "
 const menu: { label: View; icon: string }[] = [
   { label: "Resumen", icon: "" }, { label: "Inventario", icon: "" },
   { label: "Ventas", icon: "" }, { label: "Recargas", icon: "" },
-  { label: "Movimientos", icon: "" }, { label: "Clientes", icon: "" },
+  { label: "Movimientos", icon: "" },
   { label: "Caja", icon: "" }, { label: "Reportes", icon: "" },
 ];
 
