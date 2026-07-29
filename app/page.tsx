@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { Models } from "appwrite";
 import { account } from "../lib/appwrite";
 
-import { fetchInventario, fetchVentas, createVenta, deleteVenta, fetchClientes, createCliente, deleteCliente, fetchGastos, createGasto, deleteGasto, createCierreCaja, fetchMovimientos, clearAllMovimientos, fetchRecargas, createRecarga, deleteRecarga, recepcionarRecarga, updateInventoryStock, fetchUserProfile, fetchGalonesHoy, saveGalonesHoy, InventoryItem, SaleItem, ClientItem, GastoItem, MovementItem, RecargaItem } from "../lib/db";
+import { fetchInventario, fetchVentas, createVenta, updateVenta, deleteVenta, fetchClientes, createCliente, deleteCliente, fetchGastos, createGasto, deleteGasto, createCierreCaja, fetchMovimientos, clearAllMovimientos, fetchRecargas, createRecarga, deleteRecarga, recepcionarRecarga, updateInventoryStock, fetchUserProfile, fetchGalonesHoy, saveGalonesHoy, InventoryItem, SaleItem, ClientItem, GastoItem, MovementItem, RecargaItem } from "../lib/db";
 import { exportToCSV, printPDFReport } from "../lib/export";
 
 type View = "Resumen" | "Inventario" | "Ventas" | "Recargas" | "Movimientos" | "Clientes" | "Caja" | "Reportes";
@@ -12,7 +12,6 @@ type View = "Resumen" | "Inventario" | "Ventas" | "Recargas" | "Movimientos" | "
 const menu: { label: View; icon: string }[] = [
   { label: "Resumen", icon: "" }, { label: "Inventario", icon: "" },
   { label: "Ventas", icon: "" }, { label: "Recargas", icon: "" },
-  { label: "Movimientos", icon: "" },
   { label: "Caja", icon: "" }, { label: "Reportes", icon: "" },
 ];
 
@@ -52,41 +51,54 @@ function StatCard({ label, value, detail }: { label: string; value: string; deta
   </article>;
 }
 
-function SalesTable({ sales, onRequestDelete }: { sales: SaleItem[]; onRequestDelete?: (type: "venta", id: string, label: string) => void }) {
+function SalesTable({ sales, onRequestDelete, onEditVenta }: { sales: SaleItem[]; onRequestDelete?: (type: "venta", id: string, label: string) => void; onEditVenta?: (sale: SaleItem) => void }) {
   if (sales.length === 0) {
-    return <div className="empty-state"><h3>Sin ventas registradas para esta fecha</h3><p>Las ventas que registre en el sistema aparecer?n aqu? en tiempo real.</p></div>;
+    return <div className="empty-state"><h3>Sin ventas registradas para esta fecha</h3><p>Las ventas que registre en el sistema aparecerán aquí en tiempo real.</p></div>;
   }
 
   return <div className="table-wrap"><table>
-    <thead><tr><th>Venta</th><th>Hora</th><th>Cliente</th><th>Balón</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Pago</th><th>Estado</th>{onRequestDelete ? <th>Acciones</th> : null}</tr></thead>
-    <tbody>{sales.map((sale, idx) => <tr key={sale.$id || sale.id || idx}>
-      <td className="code">{sale.id || sale.$id?.slice(-6).toUpperCase()}</td>
-      <td>{sale.time || "Ahora"}</td>
-      <td className="customer">{sale.client || sale.cliente_nombre}</td>
-      <td><span className={`pill ${(sale.tipo_balon || sale.type) === "Premium" ? "premium" : "normal"}`}>{sale.tipo_balon || sale.type}</span></td>
-      <td>{sale.cantidad || sale.qty}</td>
-      <td>S/ {(sale.precio_unitario || sale.price || 0).toFixed(2)}</td>
-      <td className="total">S/ {(sale.total || 0).toFixed(2)}</td>
-      <td>{sale.forma_pago || sale.payment}</td>
-      <td>
-        <span style={{
-          display: "inline-block",
-          padding: "4px 8px",
-          borderRadius: "4px",
-          fontSize: "12px",
-          fontWeight: "bold",
-          border: "1px solid",
-          background: (!sale.estado || sale.estado === "confirmada") ? "#e6f4ea" : "#fce8e6",
-          color: (!sale.estado || sale.estado === "confirmada") ? "#137333" : "#c5221f",
-          borderColor: (!sale.estado || sale.estado === "confirmada") ? "#c3e6cb" : "#f5c6cb"
-        }}>
-          {(!sale.estado || sale.estado === "confirmada") ? "Completo" :
-           sale.estado === "debe_pago" ? "Debe pagar" :
-           sale.estado === "debe_balon" ? "Debe balón" : "Debe ambos"}
-        </span>
-      </td>
-      {onRequestDelete && sale.$id ? <td><button className="delete-btn" onClick={() => onRequestDelete("venta", sale.$id!, `la venta por S/ ${(sale.total || 0).toFixed(2)}`)}>Eliminar</button></td> : null}
-    </tr>)}</tbody>
+    <thead><tr><th>Venta</th><th>Hora</th><th>Cliente</th><th>Balón</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Pago</th><th>Estado</th><th>Observaciones</th>{(onRequestDelete || onEditVenta) ? <th>Acciones</th> : null}</tr></thead>
+    <tbody>{sales.map((sale, idx) => {
+      const isDebt = sale.estado && sale.estado !== "confirmada";
+      return <tr key={sale.$id || sale.id || idx} style={isDebt ? { background: "#fff5f5", borderLeft: "4px solid #ef4444" } : {}}>
+        <td className="code">{sale.id || sale.$id?.slice(-6).toUpperCase()}</td>
+        <td>{sale.time || "Ahora"}</td>
+        <td className="customer"><b>{sale.client || sale.cliente_nombre}</b></td>
+        <td><span className={`pill ${(sale.tipo_balon || sale.type) === "Premium" ? "premium" : "normal"}`}>{sale.tipo_balon || sale.type}</span></td>
+        <td><b>{sale.cantidad || sale.qty}</b></td>
+        <td>S/ {(sale.precio_unitario || sale.price || 0).toFixed(2)}</td>
+        <td className="total" style={isDebt ? { color: "#dc2626", fontWeight: 800 } : {}}>S/ {(sale.total || 0).toFixed(2)}</td>
+        <td><span className={`pill ${sale.forma_pago === "Por definir" ? "muted" : "normal"}`}>{sale.forma_pago || sale.payment || "Efectivo"}</span></td>
+        <td>
+          <span style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+            padding: "4px 10px",
+            borderRadius: "6px",
+            fontSize: "12px",
+            fontWeight: 800,
+            border: "1px solid",
+            background: (!sale.estado || sale.estado === "confirmada") ? "#e6f4ea" : "#fee2e2",
+            color: (!sale.estado || sale.estado === "confirmada") ? "#137333" : "#991b1b",
+            borderColor: (!sale.estado || sale.estado === "confirmada") ? "#c3e6cb" : "#fca5a5"
+          }}>
+            {(!sale.estado || sale.estado === "confirmada") ? "✓ Completo" :
+             sale.estado === "debe_pago" ? "⚠️ Debe pagar" :
+             sale.estado === "debe_balon" ? "🎈 Debe balón" : "🚨 Debe ambos (S/ + Balón)"}
+          </span>
+        </td>
+        <td style={{ fontSize: "12px", color: sale.observacion ? "#0f172a" : "#94a3b8", fontStyle: sale.observacion ? "normal" : "italic" }}>
+          {sale.observacion || "Sin notas"}
+        </td>
+        {(onRequestDelete || onEditVenta) ? <td>
+          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+            {onEditVenta ? <button style={{ padding: "5px 10px", background: "#0f172a", color: "#fff", border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }} onClick={() => onEditVenta(sale)}>Editar</button> : null}
+            {onRequestDelete && sale.$id ? <button className="delete-btn" onClick={() => onRequestDelete("venta", sale.$id!, `la venta por S/ ${(sale.total || 0).toFixed(2)}`)}>Eliminar</button> : null}
+          </div>
+        </td> : null}
+      </tr>;
+    })}</tbody>
   </table></div>;
 }
 
@@ -245,6 +257,42 @@ export default function Home() {
   const [cierreSaldoReal, setCierreSaldoReal] = useState(0);
   const [cierreObs, setCierreObs] = useState("");
   const [savingCierre, setSavingCierre] = useState(false);
+
+  // Edit Sale Form State
+  const [editingSale, setEditingSale] = useState<SaleItem | null>(null);
+  const [editEstado, setEditEstado] = useState("confirmada");
+  const [editFormaPago, setEditFormaPago] = useState("Efectivo");
+  const [editObservacion, setEditObservacion] = useState("");
+  const [editVacios, setEditVacios] = useState(1);
+  const [savingEditVenta, setSavingEditVenta] = useState(false);
+
+  function handleOpenEditVenta(sale: SaleItem) {
+    setEditingSale(sale);
+    setEditEstado(sale.estado || "confirmada");
+    setEditFormaPago(sale.forma_pago || sale.payment || "Efectivo");
+    setEditObservacion(sale.observacion || "");
+    setEditVacios(sale.vacios_recibidos || 0);
+  }
+
+  async function handleSaveEditVenta(e: FormEvent) {
+    e.preventDefault();
+    if (!editingSale?.$id) return;
+    setSavingEditVenta(true);
+    try {
+      await updateVenta(editingSale.$id, {
+        estado: editEstado,
+        forma_pago: editFormaPago,
+        observacion: editObservacion,
+        vacios_recibidos: Number(editVacios),
+      });
+      await loadAppwriteContent();
+      setEditingSale(null);
+    } catch (err) {
+      console.error("Error al editar venta:", err);
+    } finally {
+      setSavingEditVenta(false);
+    }
+  }
 
   const title = useMemo(() => view === "Resumen" ? "Resumen del negocio" : view, [view]);
 
@@ -565,6 +613,15 @@ export default function Home() {
   const ventasEfectivo = selectedSales.filter(s => s.forma_pago === "Efectivo").reduce((acc, curr) => acc + (curr.total || 0), 0);
   const ventasDigitales = selectedSales.filter(s => s.forma_pago !== "Efectivo").reduce((acc, curr) => acc + (curr.total || 0), 0);
 
+  const salesDeudorasPago = selectedSales.filter(s => s.estado === "debe_pago" || s.estado === "debe_ambos");
+  const ventasDeudorasSoles = salesDeudorasPago.reduce((acc, curr) => acc + (curr.total || 0), 0);
+
+  const salesDeudorasBalon = selectedSales.filter(s => s.estado === "debe_balon" || s.estado === "debe_ambos");
+  const ventasDeudorasBalones = salesDeudorasBalon.reduce((acc, curr) => acc + (curr.cantidad || curr.qty || 1), 0);
+
+  const salesDeudorasTotales = selectedSales.filter(s => s.estado && s.estado !== "confirmada");
+  const totalDeudorasCount = salesDeudorasTotales.length;
+
   const normalLleno = inventory.find(i => i.tipo_balon === "Normal" && i.estado === "lleno")?.cantidad || 0;
   const normalVacio = inventory.find(i => i.tipo_balon === "Normal" && i.estado === "vac\u00edo")?.cantidad || 0;
   const premiumLleno = inventory.find(i => i.tipo_balon === "Premium" && i.estado === "lleno")?.cantidad || 0;
@@ -803,8 +860,8 @@ export default function Home() {
           </article>
         </section>
 
-        <section className="panel sales-panel"><div className="panel-head"><div><h3>Últimas ventas</h3></div><button onClick={() => setView("Ventas")}>Ver todas</button></div><SalesTable sales={selectedSales} onRequestDelete={handleRequestDelete} /></section>
-      </div> : <ModuleView view={view} onAdd={() => setModal(true)} onAddGasto={() => setGastoModal(true)} onCierreCaja={() => setCierreModal(true)} onAddCliente={() => setClienteModal(true)} onAddRecarga={() => setRecargaModal(true)} onRecepcionar={handleRecepcionar} sales={selectedSales} inventory={inventory} clients={clientsList} gastos={selectedGastos} movimientos={selectedMovimientos} recargas={recargasList} onAdjust={handleAdjustStock} onSetAggregateStock={handleSetAggregateStock} onRequestDelete={handleRequestDelete} galonesChofer={galonesChofer} setGalonesChofer={setGalonesChofer} savingGalones={savingGalones} setSavingGalones={setSavingGalones} saveGalonesHoy={saveGalonesHoy} precioProveedorBalon={precioProveedorBalon} setPrecioProveedorBalon={setPrecioProveedorBalon} />}
+        <section className="panel sales-panel"><div className="panel-head"><div><h3>Últimas ventas</h3></div><button onClick={() => setView("Ventas")}>Ver todas</button></div><SalesTable sales={selectedSales} onRequestDelete={handleRequestDelete} onEditVenta={handleOpenEditVenta} /></section>
+      </div> : <ModuleView view={view} onAdd={() => setModal(true)} onAddGasto={() => setGastoModal(true)} onCierreCaja={() => setCierreModal(true)} onAddCliente={() => setClienteModal(true)} onAddRecarga={() => setRecargaModal(true)} onRecepcionar={handleRecepcionar} sales={selectedSales} inventory={inventory} clients={clientsList} gastos={selectedGastos} movimientos={selectedMovimientos} recargas={recargasList} onAdjust={handleAdjustStock} onSetAggregateStock={handleSetAggregateStock} onRequestDelete={handleRequestDelete} onEditVenta={handleOpenEditVenta} galonesChofer={galonesChofer} setGalonesChofer={setGalonesChofer} savingGalones={savingGalones} setSavingGalones={setSavingGalones} saveGalonesHoy={saveGalonesHoy} precioProveedorBalon={precioProveedorBalon} setPrecioProveedorBalon={setPrecioProveedorBalon} />}
     </section>
 
     {modal && <div className="modal-backdrop" onMouseDown={() => setModal(false)}><section className="modal" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setModal(false)}>×</button><span className="eyebrow">NUEVA OPERACIÓN</span><h2>Registrar venta</h2><form onSubmit={handleSaveSale}>
@@ -848,6 +905,59 @@ export default function Home() {
     {cierreModal && <div className="modal-backdrop" onMouseDown={() => setCierreModal(false)}><section className="modal" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setCierreModal(false)}>×</button><span className="eyebrow">ARQUEO DIARIO</span><h2>Cierre de caja del día</h2><form onSubmit={(e) => handleSaveCierre(e, (ventasEfectivo - totalGastosHoy), ventasEfectivo, ventasDigitales, totalGastosHoy)}><div className="form-grid"><label>Ventas en efectivo<span>S/ {ventasEfectivo.toFixed(2)}</span></label><label>Ventas digitales (Yape/Plin)<span>S/ {ventasDigitales.toFixed(2)}</span></label><label>Gastos del día<span>S/ {totalGastosHoy.toFixed(2)}</span></label><label>Saldo esperado en efectivo<strong>S/ {(ventasEfectivo - totalGastosHoy).toFixed(2)}</strong></label><label>Saldo real contado en caja (S/)<input type="number" value={cierreSaldoReal} onChange={(e)=>setCierreSaldoReal(Number(e.target.value))} step="0.5" required /></label><label>Observación<input type="text" placeholder="Observaciones del cierre" value={cierreObs} onChange={(e)=>setCierreObs(e.target.value)} /></label></div><div className="modal-actions"><button type="button" onClick={()=>setCierreModal(false)}>Cancelar</button><button type="submit" className="primary" disabled={savingCierre}>{savingCierre ? "Cerrando caja…" : "Confirmar Cierre de Caja"}</button></div></form></section></div>}
 
     {deleteTarget && <div className="modal-backdrop" onMouseDown={() => setDeleteTarget(null)}><section className="modal" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setDeleteTarget(null)}>×</button><span className="eyebrow" style={{color:'#c74e49'}}>CONFIRMAR ELIMINACIÓN</span><h2>¿Eliminar registro?</h2><p style={{margin:'12px 0 24px',color:'#64748b',fontSize:'14px'}}>¿Está seguro de que desea eliminar <b>{deleteTarget.label}</b>? Esta acción se aplicará en tiempo real en Appwrite.</p><div className="modal-actions"><button type="button" onClick={()=>setDeleteTarget(null)}>Cancelar</button><button type="button" className="primary" style={{background:'#c74e49'}} disabled={deletingItem} onClick={async ()=>{ setDeletingItem(true); try { if (deleteTarget.type === "venta") await handleDeleteVenta(deleteTarget.id); else if (deleteTarget.type === "cliente") await handleDeleteCliente(deleteTarget.id); else if (deleteTarget.type === "gasto") await handleDeleteGasto(deleteTarget.id); else if (deleteTarget.type === "recarga") await handleDeleteRecarga(deleteTarget.id); } finally { setDeletingItem(false); setDeleteTarget(null); } }}>{deletingItem ? "Eliminando…" : "Sí, eliminar"}</button></div></section></div>}
+
+    {editingSale && (
+      <div className="modal-backdrop" onMouseDown={() => setEditingSale(null)}>
+        <section className="modal" onMouseDown={(e) => e.stopPropagation()}>
+          <button className="modal-close" onClick={() => setEditingSale(null)}>×</button>
+          <span className="eyebrow">EDITAR OPERACIÓN</span>
+          <h2>Editar venta #{editingSale.id || editingSale.$id?.slice(-6).toUpperCase()}</h2>
+          <p style={{ margin: '8px 0 16px', fontSize: '13px', color: '#64748b' }}>
+            Cliente: <b>{editingSale.cliente_nombre || editingSale.client}</b> ({editingSale.tipo_balon} × {editingSale.cantidad || 1}) - Total: S/ {(editingSale.total || 0).toFixed(2)}
+          </p>
+          <form onSubmit={handleSaveEditVenta}>
+            <div className="form-grid">
+              <label>Estado de Cobro / Deuda
+                <select value={editEstado} onChange={(e) => setEditEstado(e.target.value)}>
+                  <option value="confirmada">✓ Completo (Pagó y devolvió vacío)</option>
+                  <option value="debe_pago">⚠️ Debe pagar (Dinero pendiente)</option>
+                  <option value="debe_balon">🎈 Debe balón (Envase pendiente)</option>
+                  <option value="debe_ambos">🚨 Debe ambos (Dinero y balón pendiente)</option>
+                </select>
+              </label>
+
+              <label>Forma de Pago
+                <select value={editFormaPago} onChange={(e) => setEditFormaPago(e.target.value)}>
+                  <option value="Efectivo">Efectivo</option>
+                  <option value="Yape">Yape / Plin</option>
+                  <option value="Transferencia">Transferencia</option>
+                  <option value="Por definir">Por definir</option>
+                </select>
+              </label>
+
+              <label>Balones vacíos recibidos
+                <input type="number" value={editVacios} onChange={(e) => setEditVacios(Number(e.target.value))} min="0" required />
+              </label>
+
+              <label style={{ gridColumn: '1 / -1' }}>Observaciones / Notas de Cobranza
+                <input
+                  type="text"
+                  placeholder="Ej. Prometió cancelar el viernes por Yape..."
+                  value={editObservacion}
+                  onChange={(e) => setEditObservacion(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="modal-actions" style={{ marginTop: '20px' }}>
+              <button type="button" onClick={() => setEditingSale(null)}>Cancelar</button>
+              <button type="submit" className="primary" disabled={savingEditVenta}>
+                {savingEditVenta ? "Guardando cambios…" : "Guardar cambios"}
+              </button>
+            </div>
+          </form>
+        </section>
+      </div>
+    )}
   </main>;
 }
 
@@ -868,6 +978,7 @@ interface ModuleViewProps {
   onAdjust: (tipo: string, estado: string, delta: number) => void;
   onSetAggregateStock: (estado: "lleno" | "vacío", target: number) => Promise<void>;
   onRequestDelete?: (type: "venta" | "cliente" | "gasto" | "recarga", id: string, label: string) => void;
+  onEditVenta?: (sale: SaleItem) => void;
   galonesChofer: string | number;
   setGalonesChofer: React.Dispatch<React.SetStateAction<string | number>>;
   savingGalones: boolean;
@@ -877,7 +988,7 @@ interface ModuleViewProps {
   setPrecioProveedorBalon: React.Dispatch<React.SetStateAction<number>>;
 }
 
-function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAddRecarga, onRecepcionar, sales, inventory, clients, gastos, movimientos, recargas, onAdjust, onSetAggregateStock, onRequestDelete, galonesChofer, setGalonesChofer, savingGalones, setSavingGalones, saveGalonesHoy, precioProveedorBalon, setPrecioProveedorBalon }: ModuleViewProps) {
+function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAddRecarga, onRecepcionar, sales, inventory, clients, gastos, movimientos, recargas, onAdjust, onSetAggregateStock, onRequestDelete, onEditVenta, galonesChofer, setGalonesChofer, savingGalones, setSavingGalones, saveGalonesHoy, precioProveedorBalon, setPrecioProveedorBalon }: ModuleViewProps) {
   const copy: Record<View, [string,string]> = {
     Resumen: ["", ""],
     Inventario: ["Control de existencias", ""],
@@ -893,6 +1004,13 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
   const totalGastos = gastos.reduce((a, b) => a + (b.monto || 0), 0);
   const totalEfectivo = sales.filter(s => s.forma_pago === "Efectivo").reduce((a, b) => a + (b.total || 0), 0);
   const totalDigital = sales.filter(s => s.forma_pago !== "Efectivo").reduce((a, b) => a + (b.total || 0), 0);
+
+  const modSalesDeudorasPago = sales.filter(s => s.estado === "debe_pago" || s.estado === "debe_ambos");
+  const modVentasDeudorasSoles = modSalesDeudorasPago.reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const modSalesDeudorasBalon = sales.filter(s => s.estado === "debe_balon" || s.estado === "debe_ambos");
+  const modVentasDeudorasBalones = modSalesDeudorasBalon.reduce((acc, curr) => acc + (curr.cantidad || curr.qty || 1), 0);
+  const modSalesDeudorasTotales = sales.filter(s => s.estado && s.estado !== "confirmada");
+  const modTotalDeudorasCount = modSalesDeudorasTotales.length;
   const moduleCostoBaseBalon = Number(precioProveedorBalon || 0);
   const moduleGalonesLlenos = inventory.filter(i => i.estado === "lleno").reduce((a, b) => a + b.cantidad, 0);
   const moduleGalonesVacios = inventory.filter(i => i.estado === "vac\u00edo").reduce((a, b) => a + b.cantidad, 0);
@@ -1079,7 +1197,45 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
         </div>
       </div>
 
-      {view === "Ventas" ? <SalesTable sales={sales} onRequestDelete={onRequestDelete} /> :
+      {view === "Ventas" ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="caja-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+            <div className="caja-card">
+              <span>Total Ventas Hoy</span>
+              <strong style={{ color: 'var(--color-ink)' }}>S/ {totalVentas.toFixed(2)}</strong>
+              <small style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>{sales.length} ventas procesadas</small>
+            </div>
+            <div className="caja-card" style={{ background: modVentasDeudorasSoles > 0 ? '#fef2f2' : 'var(--color-paper)', borderColor: modVentasDeudorasSoles > 0 ? '#fca5a5' : 'var(--color-rule)' }}>
+              <span>Por Cobrar (Dinero)</span>
+              <strong style={{ color: modVentasDeudorasSoles > 0 ? '#dc2626' : 'var(--color-success)' }}>
+                S/ {modVentasDeudorasSoles.toFixed(2)}
+              </strong>
+              <small style={{ fontSize: '11px', color: modVentasDeudorasSoles > 0 ? '#991b1b' : 'var(--color-muted)', marginTop: '4px' }}>
+                {modSalesDeudorasPago.length} ventas pendientes de pago
+              </small>
+            </div>
+            <div className="caja-card" style={{ background: modVentasDeudorasBalones > 0 ? '#fef2f2' : 'var(--color-paper)', borderColor: modVentasDeudorasBalones > 0 ? '#fca5a5' : 'var(--color-rule)' }}>
+              <span>Balones por Devolver</span>
+              <strong style={{ color: modVentasDeudorasBalones > 0 ? '#dc2626' : 'var(--color-success)' }}>
+                {modVentasDeudorasBalones} balones
+              </strong>
+              <small style={{ fontSize: '11px', color: modVentasDeudorasBalones > 0 ? '#991b1b' : 'var(--color-muted)', marginTop: '4px' }}>
+                Envases pendientes en clientes
+              </small>
+            </div>
+            <div className="caja-card highlight" style={{ background: modTotalDeudorasCount > 0 ? '#fee2e2' : 'var(--color-paper)', borderColor: modTotalDeudorasCount > 0 ? '#ef4444' : 'var(--color-accent)' }}>
+              <span>Ventas Deudoras Totales</span>
+              <strong style={{ color: modTotalDeudorasCount > 0 ? '#991b1b' : 'var(--color-accent)', fontSize: '20px' }}>
+                {modTotalDeudorasCount} deudoras
+              </strong>
+              <small style={{ fontSize: '11px', color: modTotalDeudorasCount > 0 ? '#7f1d1d' : 'var(--color-muted)', marginTop: '4px' }}>
+                {modTotalDeudorasCount > 0 ? "⚠️ Cobros o envases pendientes" : "✓ Todas las ventas al día"}
+              </small>
+            </div>
+          </div>
+          <SalesTable sales={sales} onRequestDelete={onRequestDelete} onEditVenta={onEditVenta} />
+        </div>
+      ) :
        view === "Inventario" ? (
          <div className="inventory-detail-grid inventory-aggregate-grid">
            <article className="inventory-card aggregate-card editable-stock-card">

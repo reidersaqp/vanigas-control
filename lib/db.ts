@@ -30,6 +30,8 @@ export interface SaleItem {
   estado?: string;
   telefono?: string;
   ubicacion_url?: string;
+  observacion?: string;
+  vacios_recibidos?: number;
 }
 
 export interface ClientItem {
@@ -349,6 +351,20 @@ export async function createVenta(venta: {
     usuario_id: venta.usuario_id,
     observacion: `Venta a ${venta.cliente_nombre}`,
     fecha,
+  });
+}
+
+export async function updateVenta(rowId: string, data: {
+  estado?: string;
+  forma_pago?: string;
+  observacion?: string;
+  vacios_recibidos?: number;
+}): Promise<void> {
+  await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: "ventas",
+    rowId,
+    data,
   });
 }
 
