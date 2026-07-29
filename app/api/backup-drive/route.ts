@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
-import { google } from "googleapis";
-import * as XLSX from "xlsx";
-import { Readable } from "stream";
-import { getAuthorizedGoogleOAuthClient } from "../../../lib/google-drive-oauth";
 
 export const runtime = "nodejs";
+
+type DriveClient = ReturnType<typeof import("googleapis").google.drive>;
+type XlsxModule = typeof import("xlsx");
 
 function escapeDriveQueryValue(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
 
-async function findOrCreateFolder(drive: ReturnType<typeof google.drive>, name: string, parentId?: string) {
+async function findOrCreateFolder(drive: DriveClient, name: string, parentId?: string) {
   const parentQuery = parentId ? ` and '${parentId}' in parents` : "";
   const existing = await drive.files.list({
     q: `mimeType='application/vnd.google-apps.folder' and name='${escapeDriveQueryValue(name)}' and trashed=false${parentQuery}`,
@@ -38,7 +37,7 @@ async function findOrCreateFolder(drive: ReturnType<typeof google.drive>, name: 
   return created.data.id;
 }
 
-function appendSheet(wb: XLSX.WorkBook, name: string, rows: Record<string, unknown>[]) {
+function appendSheet(XLSX: XlsxModule, wb: any, name: string, rows: Record<string, unknown>[]) {
   const ws = XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [{ Estado: "Sin registros" }]);
   ws["!cols"] = Object.keys(rows[0] || { Estado: "" }).map(() => ({ wch: 22 }));
   XLSX.utils.book_append_sheet(wb, ws, name);
@@ -47,6 +46,13 @@ function appendSheet(wb: XLSX.WorkBook, name: string, rows: Record<string, unkno
 export async function POST(req: Request) {
   try {
     const { sales, inventory, gastos, recargas, clients, movimientos } = await req.json();
+    const [{ google }, XLSX, { Readable }, { getAuthorizedGoogleOAuthClient }] = await Promise.all([
+      import("googleapis"),
+      import("xlsx"),
+      import("stream"),
+      import("../../../lib/google-drive-oauth"),
+    ]);
+
     const auth = getAuthorizedGoogleOAuthClient();
     const drive = google.drive({ version: "v3", auth });
     const wb = XLSX.utils.book_new();
@@ -54,15 +60,15 @@ export async function POST(req: Request) {
     const dateStr = now.toISOString().split("T")[0];
     const timeStr = now.toTimeString().slice(0, 5).replace(":", "-");
     const yearFolderName = String(now.getFullYear());
-    const monthFolderName = "meses";
+    const monthFolderName = String(now.getMonth() + 1).padStart(2, "0");
 
     const baseFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID || await findOrCreateFolder(drive, "VANIGAS");
     const backupsFolderId = await findOrCreateFolder(drive, "Copias de seguridad", baseFolderId);
     const yearFolderId = await findOrCreateFolder(drive, yearFolderName, backupsFolderId);
     const monthFolderId = await findOrCreateFolder(drive, monthFolderName, yearFolderId);
 
-    appendSheet(wb, "Resumen", [{
-      "Empresa": "VANIGAS",
+    appendSheet(XLSX, wb, "Resumen", [{
+      Empresa: "VANIGAS",
       "Fecha de copia": now.toLocaleString("es-PE"),
       "Ventas registradas": (sales || []).length,
       "Clientes registrados": (clients || []).length,
@@ -72,64 +78,59 @@ export async function POST(req: Request) {
       "Gastos registrados": (gastos || []).length,
     }]);
 
-    const salesData = (sales || []).map((s: any) => ({
+    appendSheet(XLSX, wb, "Ventas", (sales || []).map((s: any) => ({
       ID: s.$id || s.id,
       Fecha: s.fecha,
       Hora: s.time,
       Cliente: s.cliente_nombre || s.client,
-      "Tipo de balón": s.tipo_balon || s.type,
+      "Tipo de balon": s.tipo_balon || s.type,
       Cantidad: s.cantidad || s.qty,
       "Precio unitario": s.precio_unitario || s.price,
       "Total vendido": s.total,
       "Forma de pago": s.forma_pago,
-      "Estado": s.estado || "confirmada",
-    }));
-    appendSheet(wb, "Ventas", salesData);
+      Estado: s.estado || "confirmada",
+      Observacion: s.observacion || "",
+    })));
 
-    const invData = (inventory || []).map((i: any) => ({
-      "Tipo de balón": i.tipo_balon,
+    appendSheet(XLSX, wb, "Inventario", (inventory || []).map((i: any) => ({
+      "Tipo de balon": i.tipo_balon,
       Estado: i.estado,
       Cantidad: i.cantidad,
-      "Stock mínimo": i.stock_minimo ?? "",
-    }));
-    appendSheet(wb, "Inventario", invData);
+      "Stock minimo": i.stock_minimo ?? "",
+    })));
 
-    const movimientosData = (movimientos || []).map((m: any) => ({
+    appendSheet(XLSX, wb, "Movimientos", (movimientos || []).map((m: any) => ({
       Fecha: m.fecha,
       "Tipo de movimiento": m.tipo_movimiento,
-      "Tipo de balón": m.tipo_balon,
-      "Estado del balón": m.estado_balon,
+      "Tipo de balon": m.tipo_balon,
+      "Estado del balon": m.estado_balon,
       Cantidad: m.cantidad,
-      Observación: m.observacion || "",
-    }));
-    appendSheet(wb, "Movimientos", movimientosData);
+      Observacion: m.observacion || "",
+    })));
 
-    const gastosData = (gastos || []).map((g: any) => ({
+    appendSheet(XLSX, wb, "Gastos", (gastos || []).map((g: any) => ({
       Fecha: g.fecha,
       Concepto: g.concepto,
-      Categoría: g.categoria,
+      Categoria: g.categoria,
       Monto: g.monto,
       "Forma de pago": g.forma_pago,
-    }));
-    appendSheet(wb, "Gastos", gastosData);
+    })));
 
-    const recargasData = (recargas || []).map((r: any) => ({
-      "Fecha de envío": r.fecha_envio,
-      "Tipo de balón": r.tipo_balon,
+    appendSheet(XLSX, wb, "Recargas", (recargas || []).map((r: any) => ({
+      "Fecha de envio": r.fecha_envio,
+      "Tipo de balon": r.tipo_balon,
       "Balones enviados": r.cantidad_enviada,
       "Balones recibidos": r.cantidad_recibida,
-      Estado: r.estado
-    }));
-    appendSheet(wb, "Recargas", recargasData);
+      Estado: r.estado,
+    })));
 
-    const clientsData = (clients || []).map((c: any) => ({
+    appendSheet(XLSX, wb, "Clientes", (clients || []).map((c: any) => ({
       Nombre: c.nombre,
-      Teléfono: c.telefono,
-      Dirección: c.direccion,
+      Telefono: c.telefono,
+      Direccion: c.direccion,
       "Tipo de cliente": c.tipo_cliente,
       "Precio habitual": c.precio_habitual,
-    }));
-    appendSheet(wb, "Clientes", clientsData);
+    })));
 
     const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
     const filename = `Backup_VANIGAS_${dateStr}_${timeStr}.xlsx`;
@@ -137,12 +138,12 @@ export async function POST(req: Request) {
     const response = await drive.files.create({
       requestBody: {
         name: filename,
-        parents: [monthFolderId]
+        parents: [monthFolderId],
       },
       media: {
         mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        body: Readable.from(buffer)
-      }
+        body: Readable.from(buffer),
+      },
     });
 
     return NextResponse.json({
@@ -155,8 +156,8 @@ export async function POST(req: Request) {
     console.error("API Backup Drive error:", err);
     const reason = err?.errors?.[0]?.reason || err?.cause?.errors?.[0]?.reason;
     const message = reason === "storageQuotaExceeded"
-      ? "El JSON actual es de una cuenta de servicio. Google Drive no permite guardar en Mi unidad con ese tipo de cuenta porque no tiene cuota. Para Drive personal gratis se necesita OAuth con tu cuenta de Google."
-      : err.message;
+      ? "Google Drive no tiene cuota disponible para guardar el archivo."
+      : err?.message || "No se pudo guardar en Google Drive.";
 
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
