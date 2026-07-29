@@ -1037,23 +1037,6 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
 
     {view === "Inventario" ? (
       <>
-        <section className="galones-section" style={{margin:'0 0 16px',padding:'16px 20px',background:'#fff',border:'1px solid #e2e8f0',borderRadius:'12px'}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'16px',flexWrap:'wrap'}}>
-            <div>
-              <h3 style={{margin:0,fontSize:'15px',fontWeight:700,color:'#0f172a'}}>Galones del chofer</h3>
-              <p style={{margin:'4px 0 0',fontSize:'13px',color:'#64748b'}}>Cantidad de galones que lleva el chofer en el carro hoy. El valor se actualiza en tiempo real en la app del chofer.</p>
-            </div>
-            <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-              <input type="text" value={galonesChofer} onChange={(e) => {
-                const val = e.target.value;
-                if (val === "" || /^\d+$/.test(val)) {
-                  setGalonesChofer(val);
-                }
-              }} style={{width:'90px',padding:'10px 14px',border:'1px solid #cbd5e1',borderRadius:'8px',fontSize:'18px',fontWeight:700,textAlign:'center',color:'#0f172a'}} placeholder="0" />
-              <button disabled={savingGalones} onClick={async () => { setSavingGalones(true); try { await saveGalonesHoy(Number(galonesChofer || 0)); } catch(err) { console.error('Error guardando galones:', err); } finally { setSavingGalones(false); } }} style={{padding:'10px 20px',background:'#0f172a',color:'#fff',border:'none',borderRadius:'8px',fontWeight:600,fontSize:'14px',cursor:'pointer'}}>{savingGalones ? 'Guardando...' : 'Guardar galones'}</button>
-            </div>
-          </div>
-        </section>
 
         <div className="caja-summary-grid" style={{marginBottom: '20px'}}>
           <div className="caja-card">
