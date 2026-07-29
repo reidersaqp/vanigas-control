@@ -1059,18 +1059,22 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
           <div className="caja-card">
             <span>Galones llenos</span>
             <strong style={{color: 'var(--color-success)'}}>{moduleGalonesLlenos} unidades</strong>
+            <small style={{fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px'}}>Listos para venta</small>
           </div>
           <div className="caja-card">
-            <span>Galones vacios</span>
+            <span>Galones vacíos</span>
             <strong style={{color: 'var(--color-warning)'}}>{moduleGalonesVacios} unidades</strong>
+            <small style={{fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px'}}>En almacén local</small>
           </div>
           <div className="caja-card">
             <span>Galones en carro</span>
             <strong>{moduleGalonesEnCarro} unidades</strong>
+            <small style={{fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px'}}>Asignados a choferes</small>
           </div>
           <div className="caja-card highlight">
-            <span>Capital en balones</span>
-            <strong>S/ {moduleCapitalBalones.toFixed(2)}</strong>
+            <span>Inventario Bruto Total</span>
+            <strong style={{color: 'var(--color-accent)'}}>{moduleInventarioBruto} balones</strong>
+            <small style={{fontSize: '11px', color: 'var(--color-ink)', fontWeight: 700, marginTop: '4px'}}>Inversión Carga: S/ {moduleCapitalBalones.toFixed(2)}</small>
           </div>
         </div>
       </>
@@ -1125,13 +1129,17 @@ function ModuleView({ view, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAdd
              <div className="inv-card-body"><strong className="inv-qty">{moduleGalonesEnCarro}</strong><span>carga registrada para el chofer</span></div>
            </article>
            <article className="inventory-card aggregate-card capital-card">
-             <div className="inv-card-head">
-               <div className="inv-info"><h4>Total fisico controlado</h4><span className="pill normal">INVENTARIO BRUTO</span></div>
-             </div>
-             <label className="stock-edit-field">Precio proveedor por balon
-               <input type="number" value={precioProveedorBalon} min="0" step="0.10" onChange={(event) => setPrecioProveedorBalon(Number(event.target.value || 0))} />
-             </label>
-             <div className="inv-card-body"><strong className="inv-qty">{moduleInventarioBruto}</strong><span>balones x S/ {moduleCostoBaseBalon.toFixed(2)} = S/ {moduleCapitalBalones.toFixed(2)}</span></div>
+              <div className="inv-card-head">
+                <div className="inv-info"><h4>Inventario Bruto Total</h4><span className="pill normal">TODOS LOS BALONES</span></div>
+              </div>
+              <label className="stock-edit-field">Costo recarga proveedor (S/)
+                <input type="number" value={precioProveedorBalon} min="0" step="0.10" onChange={(event) => setPrecioProveedorBalon(Number(event.target.value || 0))} />
+              </label>
+              <div className="inv-card-body">
+                <strong className="inv-qty">{moduleInventarioBruto} balones</strong>
+                <span style={{display:'block',marginTop:'4px',fontSize:'12px',color:'var(--color-muted)'}}>Llenos ({moduleGalonesLlenos}) + Vacíos ({moduleGalonesVacios}) + Carro ({moduleGalonesEnCarro})</span>
+                <span style={{display:'block',marginTop:'6px',fontWeight:800,color:'var(--color-accent)',fontSize:'13px'}}>Capital en Stock: S/ {moduleCapitalBalones.toFixed(2)}</span>
+              </div>
            </article>
          </div>
        ) :
