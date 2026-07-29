@@ -2,14 +2,11 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-type DriveClient = ReturnType<typeof import("googleapis").google.drive>;
-type XlsxModule = typeof import("xlsx");
-
 function escapeDriveQueryValue(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
 
-async function findOrCreateFolder(drive: DriveClient, name: string, parentId?: string) {
+async function findOrCreateFolder(drive: any, name: string, parentId?: string) {
   const parentQuery = parentId ? ` and '${parentId}' in parents` : "";
   const existing = await drive.files.list({
     q: `mimeType='application/vnd.google-apps.folder' and name='${escapeDriveQueryValue(name)}' and trashed=false${parentQuery}`,
@@ -37,7 +34,7 @@ async function findOrCreateFolder(drive: DriveClient, name: string, parentId?: s
   return created.data.id;
 }
 
-function appendSheet(XLSX: XlsxModule, wb: any, name: string, rows: Record<string, unknown>[]) {
+function appendSheet(XLSX: any, wb: any, name: string, rows: Record<string, unknown>[]) {
   const ws = XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [{ Estado: "Sin registros" }]);
   ws["!cols"] = Object.keys(rows[0] || { Estado: "" }).map(() => ({ wch: 22 }));
   XLSX.utils.book_append_sheet(wb, ws, name);
