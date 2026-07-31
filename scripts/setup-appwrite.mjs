@@ -164,12 +164,18 @@ const schema = [
       s("usuario_id", 64, true),
       s("observacion", 1000),
       s("estado", 30, false, "confirmada"),
+      s("telefono", 20),
+      s("ubicacion_url", 500),
+      s("distrito", 100),
+      f("monto_deuda_soles"),
+      i("cant_deba_balon"),
     ],
     indexes: [
       index("por_fecha", ["fecha"]),
       index("por_cliente", ["cliente_id"]),
       index("por_tipo_balon", ["tipo_balon"]),
       index("por_usuario", ["usuario_id"]),
+      index("por_distrito", ["distrito"]),
     ],
   },
   {

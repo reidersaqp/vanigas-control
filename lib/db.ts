@@ -17,6 +17,7 @@ export interface SaleItem {
   time?: string;
   client?: string;
   cliente_nombre?: string;
+  tipo_cliente?: string;
   tipo_balon: string;
   cantidad: number;
   qty?: number;
@@ -31,7 +32,10 @@ export interface SaleItem {
   telefono?: string;
   ubicacion_url?: string;
   observacion?: string;
+  distrito?: string;
   vacios_recibidos?: number;
+  monto_deuda_soles?: number;
+  cant_deba_balon?: number;
 }
 
 export interface ClientItem {
@@ -205,6 +209,9 @@ export async function fetchVentas(): Promise<SaleItem[]> {
     telefono: doc.telefono || "",
     ubicacion_url: doc.ubicacion_url || "",
     observacion: doc.observacion || "",
+    distrito: doc.distrito || "",
+    monto_deuda_soles: doc.monto_deuda_soles,
+    cant_deba_balon: doc.cant_deba_balon,
     vacios_recibidos: doc.vacios_recibidos || 0,
   }));
 }
@@ -314,70 +321,102 @@ export async function createVenta(venta: {
   estado?: string;
   telefono?: string;
   ubicacion_url?: string;
+  observacion?: string;
+  distrito?: string;
+  monto_deuda_soles?: number;
+  cant_deba_balon?: number;
 }): Promise<void> {
   const fecha = new Date().toISOString();
   const total = venta.total || (venta.cantidad * venta.precio_unitario);
   const newId = ID.unique();
 
-  await tablesDB.createRow({
-    databaseId: DATABASE_ID,
-    tableId: "ventas",
-    rowId: newId,
-    data: {
-      fecha,
-      cliente_nombre: venta.cliente_nombre,
-      tipo_cliente: venta.tipo_cliente,
-      tipo_balon: venta.tipo_balon,
-      cantidad: venta.cantidad,
-      precio_unitario: venta.precio_unitario,
-      total,
-      forma_pago: venta.forma_pago,
-      vacios_recibidos: venta.vacios_recibidos,
-      usuario_id: venta.usuario_id,
-      estado: venta.estado || "confirmada",
-      telefono: venta.telefono || "",
-      ubicacion_url: venta.ubicacion_url || "",
-    }
-  });
+  const payload: Record<string, any> = {
+    fecha,
+    cliente_nombre: venta.cliente_nombre,
+    tipo_cliente: venta.tipo_cliente,
+    tipo_balon: venta.tipo_balon,
+    cantidad: venta.cantidad,
+    precio_unitario: venta.precio_unitario,
+    total,
+    forma_pago: venta.forma_pago,
+    vacios_recibidos: venta.vacios_recibidos,
+    usuario_id: venta.usuario_id,
+    estado: venta.estado || "confirmada",
+    telefono: venta.telefono || "",
+    ubicacion_url: venta.ubicacion_url || "",
+    observacion: venta.observacion || "",
+  };
 
-  await updateInventoryStock(venta.tipo_balon, "lleno", -venta.cantidad);
-  if (venta.vacios_recibidos > 0) {
-    await updateInventoryStock(venta.tipo_balon, "vacío", +venta.vacios_recibidos);
+  if (venta.distrito) payload.distrito = venta.distrito;
+  if (venta.monto_deuda_soles !== undefined && venta.monto_deuda_soles !== 0) payload.monto_deuda_soles = venta.monto_deuda_soles;
+  if (venta.cant_deba_balon !== undefined && venta.cant_deba_balon !== 0) payload.cant_deba_balon = venta.cant_deba_balon;
+
+  try {
+    await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: "ventas",
+      rowId: newId,
+      data: payload,
+    });
+  } catch (err) {
+    delete payload.distrito;
+    delete payload.monto_deuda_soles;
+    delete payload.cant_deba_balon;
+    if (venta.distrito && !payload.observacion.includes("Distrito:")) {
+      payload.observacion = `Distrito: ${venta.distrito}${payload.observacion ? ` | ${payload.observacion}` : ""}`;
+    }
+    await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: "ventas",
+      rowId: newId,
+      data: payload,
+    });
   }
 
-  await createMovimiento({
-    tipo_movimiento: "Venta",
-    tipo_balon: venta.tipo_balon,
-    estado_balon: "lleno",
-    cantidad: venta.cantidad,
-    usuario_id: venta.usuario_id,
-    observacion: `Venta a ${venta.cliente_nombre}`,
-    fecha,
-  });
+  await Promise.all([
+    updateInventoryStock(venta.tipo_balon, "lleno", -venta.cantidad),
+    venta.vacios_recibidos > 0
+      ? updateInventoryStock(venta.tipo_balon, "vacío", venta.vacios_recibidos)
+      : Promise.resolve(),
+    createMovimiento({
+      tipo_movimiento: "Venta",
+      tipo_balon: venta.tipo_balon,
+      estado_balon: "lleno",
+      cantidad: venta.cantidad,
+      usuario_id: venta.usuario_id,
+      observacion: `Venta a ${venta.cliente_nombre}${venta.distrito ? ` (${venta.distrito})` : ''}`,
+      fecha,
+    })
+  ]);
 }
 
-export async function updateVenta(rowId: string, data: {
-  estado?: string;
-  forma_pago?: string;
-  observacion?: string;
-  vacios_recibidos?: number;
-}): Promise<void> {
+export async function updateVenta(rowId: string, data: Record<string, any>): Promise<void> {
+  const cleanData: Record<string, any> = {};
+  for (const key of Object.keys(data)) {
+    if (data[key] !== undefined) {
+      cleanData[key] = data[key];
+    }
+  }
+
   try {
     await tablesDB.updateRow({
       databaseId: DATABASE_ID,
       tableId: "ventas",
       rowId,
-      data,
+      data: cleanData,
     });
   } catch (error) {
+    console.error("Error al actualizar venta en Appwrite:", error);
+    const fallbackData: Record<string, any> = {};
+    const safeKeys = ["cliente_nombre", "tipo_balon", "cantidad", "precio_unitario", "total", "forma_pago", "estado", "observacion", "tipo_cliente", "usuario_id", "vacios_recibidos", "monto_deuda_soles", "cant_deba_balon", "fecha"];
+    for (const key of safeKeys) {
+      if (cleanData[key] !== undefined) fallbackData[key] = cleanData[key];
+    }
     await tablesDB.updateRow({
       databaseId: DATABASE_ID,
       tableId: "ventas",
       rowId,
-      data: {
-        estado: data.estado,
-        forma_pago: data.forma_pago,
-      },
+      data: fallbackData,
     });
   }
 }
