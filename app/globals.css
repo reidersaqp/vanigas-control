@@ -752,6 +752,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.inventory-admin-grid.finance.inventory-finance-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .inventory-finance-card {
   padding: 18px;
 }
@@ -771,6 +775,20 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 .money-input input {
   margin-top: 0;
+}
+
+.readonly-number {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+  border: 1px solid #cdd8e2;
+  border-radius: 12px;
+  background: #fbfdff;
+  padding: 12px 14px;
+  color: var(--color-ink);
+  font-size: 26px;
+  font-weight: 900;
 }
 
 .inventory-kpi-grid {
@@ -2390,6 +2408,134 @@ tr:hover td {
   color: var(--color-ink);
 }
 
+.cash-daily-chart {
+  background: #ffffff;
+  border: var(--rule-thin) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  padding: 22px;
+  box-shadow: var(--elevation-low);
+  margin: var(--space-lg) 0;
+}
+
+.cash-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+  border-bottom: var(--rule-thin) solid var(--color-rule);
+}
+
+.cash-chart-header span,
+.cash-balance-box small {
+  color: var(--color-muted);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cash-chart-header h4 {
+  margin: 4px 0 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.cash-balance-box {
+  min-width: 220px;
+  padding: 14px 18px;
+  border: var(--rule-thin) solid var(--color-rule);
+  border-radius: var(--radius-sm);
+  background: #f8fafc;
+}
+
+.cash-balance-box strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 1.05;
+}
+
+.cash-bar-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.cash-chart-item {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 112px;
+  padding: 16px;
+  border: var(--rule-thin) solid var(--color-rule);
+  border-radius: 16px;
+  background: #fbfdff;
+}
+
+.cash-chart-row-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cash-chart-row-head small {
+  color: var(--color-muted);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cash-chart-row-head strong {
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.cash-bar-track {
+  width: 100%;
+  height: 18px;
+  background: #eef3f7;
+  border: var(--rule-thin) solid var(--color-rule);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.cash-bar-track span {
+  display: block;
+  height: 100%;
+  background: #111827;
+  border-radius: inherit;
+}
+
+.section-mini-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 0 12px;
+}
+
+.section-mini-title h4 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--color-ink);
+}
+
+.section-mini-title span {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .caja-card .card-amount {
   font-family: var(--font-display);
   font-size: var(--text-xl);
@@ -2536,6 +2682,14 @@ tr:hover td {
   color: var(--color-ink);
 }
 
+.caja-card.card-cash {
+  border-top: 1px solid #d7e0e8;
+}
+
+.caja-card.card-cash .card-amount {
+  color: var(--color-ink);
+}
+
 .caja-card.card-digital {
   border-top: 1px solid #d7e0e8;
 }
@@ -2568,6 +2722,62 @@ tr:hover td {
 
 .caja-card.card-neutro {
   border-top: 1px solid #d7e0e8;
+}
+
+.debts-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.debt-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.8fr);
+  gap: 18px;
+}
+
+.debt-panel {
+  background: #fff;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--elevation-low);
+}
+
+.debt-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.debt-panel-head h4 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--color-ink);
+}
+
+.debt-panel-head span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-muted);
+}
+
+.debt-date-table {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.debt-date-table table {
+  min-width: 100%;
+}
+
+.debt-date-table tr.selected-debt-date td {
+  background: #f8fafc;
+  font-weight: 800;
 }
 
 .debt-summary-card {
@@ -3022,6 +3232,16 @@ tr:hover td {
   }
   .caja-summary-grid {
     grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .cash-chart-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cash-balance-box {
+    min-width: 0;
+  }
+  .cash-bar-list {
+    grid-template-columns: minmax(0, 1fr);
   }
   .inventory-detail-grid {
     grid-template-columns: minmax(0, 1fr) !important;

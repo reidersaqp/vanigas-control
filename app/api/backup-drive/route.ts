@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 function escapeDriveQueryValue(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
@@ -40,9 +42,33 @@ function appendSheet(XLSX: any, wb: any, name: string, rows: Record<string, unkn
   XLSX.utils.book_append_sheet(wb, ws, name);
 }
 
+function getSaleDebtInfo(sale: any) {
+  const estado = sale.estado || "confirmada";
+  const total = Number(sale.total || 0);
+  const qty = Number(sale.cantidad || sale.qty || 1);
+  const moneyDebt = estado === "debe_pago" || estado === "debe_ambos" || estado === "pendiente"
+    ? Number(sale.monto_deuda_soles !== undefined && sale.monto_deuda_soles !== null ? sale.monto_deuda_soles : total)
+    : 0;
+  const cylinderDebt = estado === "debe_balon" || estado === "debe_ambos"
+    ? Number(sale.cant_deba_balon !== undefined && sale.cant_deba_balon !== null ? sale.cant_deba_balon : qty)
+    : 0;
+  const charged = Math.max(0, total - moneyDebt);
+  const hasDebt = moneyDebt > 0 || cylinderDebt > 0 || estado === "pendiente";
+  return { moneyDebt, cylinderDebt, charged, hasDebt };
+}
+
+function getDebtLabel(sale: any) {
+  const estado = sale.estado;
+  if (!estado || estado === "confirmada") return "Completo";
+  if (estado === "debe_pago") return "Debe pagar";
+  if (estado === "debe_balon") return "Debe balon";
+  if (estado === "debe_ambos") return "Debe pago y balon";
+  return "Pendiente";
+}
+
 export async function POST(req: Request) {
   try {
-    const { sales, inventory, gastos, recargas, clients, movimientos } = await req.json();
+    const { sales, allSales, inventory, gastos, allGastos, recargas, clients, movimientos, selectedDate } = await req.json();
     const [{ google }, XLSX, { Readable }, { getAuthorizedGoogleOAuthClient }] = await Promise.all([
       import("googleapis"),
       import("xlsx"),
@@ -63,31 +89,84 @@ export async function POST(req: Request) {
     const backupsFolderId = await findOrCreateFolder(drive, "Copias de seguridad", baseFolderId);
     const yearFolderId = await findOrCreateFolder(drive, yearFolderName, backupsFolderId);
     const monthFolderId = await findOrCreateFolder(drive, monthFolderName, yearFolderId);
+    const salesData = Array.isArray(allSales) && allSales.length > 0 ? allSales : (sales || []);
+    const gastosData = Array.isArray(allGastos) && allGastos.length > 0 ? allGastos : (gastos || []);
+    const debtSales = salesData.filter((s: any) => getSaleDebtInfo(s).hasDebt);
+    const totalVendido = salesData.reduce((acc: number, s: any) => acc + Number(s.total || 0), 0);
+    const totalCobrado = salesData.reduce((acc: number, s: any) => acc + getSaleDebtInfo(s).charged, 0);
+    const totalPorCobrar = salesData.reduce((acc: number, s: any) => acc + getSaleDebtInfo(s).moneyDebt, 0);
+    const totalEnvasesPendientes = salesData.reduce((acc: number, s: any) => acc + getSaleDebtInfo(s).cylinderDebt, 0);
+    const totalGastos = gastosData.reduce((acc: number, g: any) => acc + Number(g.monto || 0), 0);
+    const ventasDia = (sales || []);
+    const gastosDia = (gastos || []);
+    const efectivoDia = ventasDia
+      .filter((s: any) => s.forma_pago === "Efectivo")
+      .reduce((acc: number, s: any) => acc + getSaleDebtInfo(s).charged, 0);
+    const digitalDia = ventasDia
+      .filter((s: any) => s.forma_pago !== "Efectivo")
+      .reduce((acc: number, s: any) => acc + getSaleDebtInfo(s).charged, 0);
+    const gastosDelDia = gastosDia.reduce((acc: number, g: any) => acc + Number(g.monto || 0), 0);
 
     appendSheet(XLSX, wb, "Resumen", [{
       Empresa: "VANIGAS",
       "Fecha de copia": now.toLocaleString("es-PE"),
-      "Ventas registradas": (sales || []).length,
+      "Fecha de trabajo": selectedDate || "",
+      "Ventas registradas": salesData.length,
       "Clientes registrados": (clients || []).length,
       "Productos en inventario": (inventory || []).length,
       "Movimientos registrados": (movimientos || []).length,
       "Recargas registradas": (recargas || []).length,
-      "Gastos registrados": (gastos || []).length,
+      "Gastos registrados": gastosData.length,
+      "Total vendido": totalVendido,
+      "Cobrado real": totalCobrado,
+      "Por cobrar": totalPorCobrar,
+      "Envases pendientes": totalEnvasesPendientes,
+      "Gastos": totalGastos,
     }]);
 
-    appendSheet(XLSX, wb, "Ventas", (sales || []).map((s: any) => ({
+    appendSheet(XLSX, wb, "Ventas", salesData.map((s: any) => {
+      const deuda = getSaleDebtInfo(s);
+      return {
       ID: s.$id || s.id,
       Fecha: s.fecha,
-      Hora: s.time,
       Cliente: s.cliente_nombre || s.client,
+      Distrito: s.distrito || "",
       "Tipo de balon": s.tipo_balon || s.type,
       Cantidad: s.cantidad || s.qty,
       "Precio unitario": s.precio_unitario || s.price,
       "Total vendido": s.total,
+      "Cobrado": deuda.charged,
+      "Por cobrar": deuda.moneyDebt,
+      "Envases prestados": deuda.cylinderDebt,
       "Forma de pago": s.forma_pago,
-      Estado: s.estado || "confirmada",
+      Estado: getDebtLabel(s),
       Observacion: s.observacion || "",
-    })));
+      };
+    }));
+
+    appendSheet(XLSX, wb, "Deudas", debtSales.map((s: any) => {
+      const deuda = getSaleDebtInfo(s);
+      return {
+        Fecha: s.fecha,
+        Cliente: s.cliente_nombre || s.client,
+        Distrito: s.distrito || "",
+        "Total vendido": s.total,
+        "Cobrado": deuda.charged,
+        "Por cobrar": deuda.moneyDebt,
+        "Envases prestados": deuda.cylinderDebt,
+        "Forma de pago": s.forma_pago,
+        Estado: getDebtLabel(s),
+        Observacion: s.observacion || "",
+      };
+    }));
+
+    appendSheet(XLSX, wb, "Caja diaria", [{
+      "Fecha de trabajo": selectedDate || "",
+      "Efectivo recibido": efectivoDia,
+      "Digital recibido": digitalDia,
+      "Gastos del dia": gastosDelDia,
+      "Saldo esperado": efectivoDia - gastosDelDia,
+    }]);
 
     appendSheet(XLSX, wb, "Inventario", (inventory || []).map((i: any) => ({
       "Tipo de balon": i.tipo_balon,
@@ -105,7 +184,7 @@ export async function POST(req: Request) {
       Observacion: m.observacion || "",
     })));
 
-    appendSheet(XLSX, wb, "Gastos", (gastos || []).map((g: any) => ({
+    appendSheet(XLSX, wb, "Gastos", gastosData.map((g: any) => ({
       Fecha: g.fecha,
       Concepto: g.concepto,
       Categoria: g.categoria,
@@ -118,6 +197,9 @@ export async function POST(req: Request) {
       "Tipo de balon": r.tipo_balon,
       "Balones enviados": r.cantidad_enviada,
       "Balones recibidos": r.cantidad_recibida,
+      "Costo unitario": r.costo_unitario || 0,
+      "Costo total": r.costo_total || ((r.cantidad_enviada || 0) * (r.costo_unitario || 0)),
+      Proveedor: r.proveedor || "Planta",
       Estado: r.estado,
     })));
 

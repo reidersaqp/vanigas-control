@@ -1,19 +1,37 @@
-// Helper utility for generating CSV/Excel files and Printable PDF Reports for VANIGAS
+// Helper utility for generating Excel files and Printable PDF Reports for VANIGAS
 
-export function exportToCSV(filename: string, rows: Record<string, any>[]) {
+import * as XLSX from "xlsx";
+
+export function exportToExcel(filename: string, sheets: { name: string; rows: Record<string, unknown>[] }[]) {
+  const wb = XLSX.utils.book_new();
+  const validSheets = sheets.length > 0 ? sheets : [{ name: "Datos", rows: [] }];
+
+  validSheets.forEach((sheet) => {
+    const rows = sheet.rows.length > 0 ? sheet.rows : [{ Estado: "Sin registros" }];
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = Object.keys(rows[0] || { Estado: "" }).map(() => ({ wch: 24 }));
+    XLSX.utils.book_append_sheet(wb, ws, sheet.name.slice(0, 31));
+  });
+
+  XLSX.writeFile(wb, filename.endsWith(".xlsx") ? filename : `${filename}.xlsx`);
+}
+
+export function exportToCSV(filename: string, rows: Record<string, unknown>[]) {
   if (!rows || rows.length === 0) {
     alert("No hay datos disponibles para exportar.");
     return;
   }
 
   const headers = Object.keys(rows[0]);
+  const separator = ";";
   const csvContent = [
-    headers.join(","),
+    `sep=${separator}`,
+    headers.join(separator),
     ...rows.map(row => headers.map(header => {
       const val = row[header] ?? "";
       return `"${String(val).replace(/"/g, '""')}"`;
-    }).join(","))
-  ].join("\n");
+    }).join(separator))
+  ].join("\r\n");
 
   const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 /* eslint-disable @next/next/no-img-element */
 
@@ -9,12 +9,12 @@ import { account } from "../lib/appwrite";
 import { fetchInventario, fetchVentas, createVenta, updateVenta, deleteVenta, fetchClientes, createCliente, deleteCliente, fetchGastos, createGasto, deleteGasto, createCierreCaja, fetchMovimientos, fetchRecargas, createRecarga, deleteRecarga, recepcionarRecarga, updateInventoryStock, fetchUserProfile, fetchGalonesHoy, saveGalonesHoy, InventoryItem, SaleItem, ClientItem, GastoItem, MovementItem, RecargaItem } from "../lib/db";
 import { exportToCSV, printPDFReport } from "../lib/export";
 
-type View = "Resumen" | "Inventario" | "Ventas" | "Recargas" | "Movimientos" | "Clientes" | "Caja" | "Reportes";
-const views: View[] = ["Resumen", "Inventario", "Ventas", "Recargas", "Movimientos", "Clientes", "Caja", "Reportes"];
+type View = "Resumen" | "Inventario" | "Ventas" | "Deudas" | "Recargas" | "Movimientos" | "Clientes" | "Caja" | "Reportes";
+const views: View[] = ["Resumen", "Inventario", "Ventas", "Deudas", "Recargas", "Movimientos", "Clientes", "Caja", "Reportes"];
 
 const menu: { label: View; icon: string }[] = [
   { label: "Resumen", icon: "" }, { label: "Inventario", icon: "" },
-  { label: "Ventas", icon: "" }, { label: "Recargas", icon: "" },
+  { label: "Ventas", icon: "" }, { label: "Deudas", icon: "" }, { label: "Recargas", icon: "" },
   { label: "Caja", icon: "" }, { label: "Reportes", icon: "" },
 ];
 
@@ -28,6 +28,13 @@ function toNumericInput(value: string): number | "" {
 function toDecimalInput(value: string): number | "" {
   const clean = value.replace(/[^0-9.]/g, "");
   return clean === "" ? "" : Number(clean);
+}
+
+function toDecimalText(value: string): string {
+  const clean = value.replace(/,/g, ".").replace(/[^0-9.]/g, "");
+  const parts = clean.split(".");
+  if (parts.length <= 1) return clean;
+  return `${parts[0]}.${parts.slice(1).join("")}`;
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -74,7 +81,7 @@ function getSaleDebtInfo(sale: SaleItem) {
   const estado = sale.estado || "confirmada";
   const total = Number(sale.total || 0);
   const qty = Number(sale.cantidad || sale.qty || 1);
-  const moneyDebt = estado === "debe_pago" || estado === "debe_ambos"
+  const moneyDebt = estado === "debe_pago" || estado === "debe_ambos" || estado === "pendiente"
     ? Number(sale.monto_deuda_soles !== undefined && sale.monto_deuda_soles !== null ? sale.monto_deuda_soles : total)
     : 0;
   const cylinderDebt = estado === "debe_balon" || estado === "debe_ambos"
@@ -85,25 +92,22 @@ function getSaleDebtInfo(sale: SaleItem) {
   return { estado, total, moneyDebt, cylinderDebt, charged, hasDebt };
 }
 
-function SalesTable({ sales, loading, onRequestDelete, onEditVenta }: { sales: SaleItem[]; loading?: boolean; onRequestDelete?: (type: "venta", id: string, label: string) => void; onEditVenta?: (sale: SaleItem) => void }) {
+function getDebtLabel(sale: SaleItem) {
+  const estado = sale.estado;
+  if (!estado || estado === "confirmada") return "Completo";
+  if (estado === "debe_pago") return "Debe pagar";
+  if (estado === "debe_balon") return "Debe balon";
+  if (estado === "debe_ambos") return "Debe pago y balon";
+  return "Pendiente";
+}
+
+function SalesTable({ sales, loading, onRequestDelete, onEditVenta, showDate = false }: { sales: SaleItem[]; loading?: boolean; onRequestDelete?: (type: "venta", id: string, label: string) => void; onEditVenta?: (sale: SaleItem) => void; showDate?: boolean }) {
   if (loading && sales.length === 0) {
     return <div className="empty-state"><h3 style={{ color: '#2563eb' }}>Cargando datos...</h3><p>Obteniendo informacion del servidor.</p></div>;
   }
   if (sales.length === 0) {
     return <div className="empty-state"><h3>Sin ventas registradas para esta fecha</h3><p>Las ventas que registre en el sistema apareceran aqui en tiempo real.</p></div>;
   }
-
-  const getDebtLabel = (sale: SaleItem) => {
-    const estado = sale.estado;
-    if (!estado || estado === "confirmada") return "Completo";
-    const debt = getSaleDebtInfo(sale);
-    if (estado === "debe_pago") return `Debe pagar`;
-    if (estado === "debe_balon") return `Debe balon`;
-    if (estado === "debe_ambos") {
-      return `Debe pago y balon`;
-    }
-    return debt.moneyDebt > 0 || debt.cylinderDebt > 0 ? "Pendiente" : "Pendiente";
-  };
 
   const getDisplayDistrito = (sale: SaleItem) => {
     if (sale.distrito) return sale.distrito;
@@ -121,14 +125,14 @@ function SalesTable({ sales, loading, onRequestDelete, onEditVenta }: { sales: S
   };
 
   return <div className="table-wrap sales-table-wrap"><table className="sales-table">
-    <thead><tr><th>Hora</th><th>Cliente</th><th>Distrito</th><th>Balon</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Cobrado</th><th>Por cobrar</th><th>Balones prestados</th><th>Pago</th><th>Estado</th><th>Observaciones</th>{(onRequestDelete || onEditVenta) ? <th>Acciones</th> : null}</tr></thead>
+    <thead><tr><th>Cliente</th>{showDate ? <th>Fecha</th> : null}<th>Distrito</th><th>Balon</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Cobrado</th><th>deben</th><th>Balones prestados</th><th>Pago</th><th>Estado</th><th>Observaciones</th>{(onRequestDelete || onEditVenta) ? <th>Acciones</th> : null}</tr></thead>
     <tbody>{sales.map((sale, idx) => {
       const debt = getSaleDebtInfo(sale);
       const isDebt = debt.hasDebt;
       const payment = sale.forma_pago || sale.payment || "Efectivo";
       return <tr key={sale.$id || sale.id || idx} className={isDebt ? "sale-row-debt" : ""}>
-        <td>{sale.time || "Ahora"}</td>
         <td className="customer"><b>{sale.client || sale.cliente_nombre}</b></td>
+        {showDate ? <td>{rowDateKey(sale.fecha) || "-"}</td> : null}
         <td>{getDisplayDistrito(sale)}</td>
         <td><span className={`sale-balon-chip ${(sale.tipo_balon || sale.type || "Normal").toLowerCase()}`}>{sale.tipo_balon || sale.type}</span></td>
         <td><b>{sale.cantidad || sale.qty}</b></td>
@@ -314,7 +318,7 @@ export default function Home() {
 
   // New Recarga Form State
   const [recQtyNormal, setRecQtyNormal] = useState(0);
-  const [recCostoUnitario, setRecCostoUnitario] = useState(44.30);
+  const [recCostoUnitario, setRecCostoUnitario] = useState("44.30");
   const [savingRecarga, setSavingRecarga] = useState(false);
   const [recargaError, setRecargaError] = useState("");
 
@@ -435,10 +439,14 @@ export default function Home() {
       } catch {}
       return updated;
     });
+    const shouldUpdateCarro = rowDateKey(editingSale?.fecha) === getTodayDateKey();
+    const nextGalonesCarro = Math.max(0, Number(galonesChofer || 0) + qtyDelta);
+    if (shouldUpdateCarro) setGalonesChofer(nextGalonesCarro);
     setEditingSale(null);
 
     try {
       await updateVenta(saleId, dbChanges);
+      if (shouldUpdateCarro && qtyDelta !== 0) await saveGalonesHoy(nextGalonesCarro);
       if (originalType !== editType) {
         await updateInventoryStock(originalType, "lleno", originalQty);
         await updateInventoryStock(editType, "lleno", -numQty);
@@ -808,6 +816,11 @@ export default function Home() {
       const restoreQty = sale.cantidad || sale.qty || 1;
       const balonType = sale.tipo_balon || sale.type || "Normal";
       await updateInventoryStock(balonType, "lleno", restoreQty);
+      if (rowDateKey(sale.fecha) === getTodayDateKey()) {
+        const nextGalonesCarro = Math.max(0, Number(galonesChofer || 0) + restoreQty);
+        setGalonesChofer(nextGalonesCarro);
+        await saveGalonesHoy(nextGalonesCarro);
+      }
     }
     await deleteVenta(id);
     await loadAppwriteContent();
@@ -1151,7 +1164,7 @@ export default function Home() {
         </section>
 
         <section className="panel sales-panel"><div className="panel-head"><div><h3>Ultimas ventas</h3></div><button onClick={() => setView("Ventas")}>Ver todas</button></div><SalesTable sales={selectedSales} onRequestDelete={handleRequestDelete} onEditVenta={handleOpenEditVenta} /></section>
-      </div> : <ModuleView view={view} selectedDate={selectedDate} onAdd={() => setModal(true)} onAddGasto={() => setGastoModal(true)} onCierreCaja={() => setCierreModal(true)} onAddCliente={() => setClienteModal(true)} onAddRecarga={() => setRecargaModal(true)} onRecepcionar={handleRecepcionar} sales={selectedSales} allSales={salesList} inventory={inventory} clients={clientsList} gastos={selectedGastos} movimientos={selectedMovimientos} recargas={recargasList} onAdjust={handleAdjustStock} onSetAggregateStock={handleSetAggregateStock} onRequestDelete={handleRequestDelete} onEditVenta={handleOpenEditVenta} galonesChofer={galonesChofer} setGalonesChofer={setGalonesChofer} savingGalones={savingGalones} setSavingGalones={setSavingGalones} saveGalonesHoy={saveGalonesHoy} precioProveedorBalon={precioProveedorBalon} setPrecioProveedorBalon={setPrecioProveedorBalon} capitalObjetivo={capitalObjetivo} setCapitalObjetivo={setCapitalObjetivo} />}
+      </div> : <ModuleView view={view} selectedDate={selectedDate} onAdd={() => setModal(true)} onAddGasto={() => setGastoModal(true)} onCierreCaja={() => setCierreModal(true)} onAddCliente={() => setClienteModal(true)} onAddRecarga={() => setRecargaModal(true)} onRecepcionar={handleRecepcionar} sales={selectedSales} allSales={salesList} allGastos={gastosList} inventory={inventory} clients={clientsList} gastos={selectedGastos} movimientos={selectedMovimientos} recargas={recargasList} onAdjust={handleAdjustStock} onSetAggregateStock={handleSetAggregateStock} onRequestDelete={handleRequestDelete} onEditVenta={handleOpenEditVenta} galonesChofer={galonesChofer} setGalonesChofer={setGalonesChofer} savingGalones={savingGalones} setSavingGalones={setSavingGalones} saveGalonesHoy={saveGalonesHoy} precioProveedorBalon={precioProveedorBalon} setPrecioProveedorBalon={setPrecioProveedorBalon} />}
     </section>
 
     {modal && <div className="modal-backdrop" onMouseDown={() => setModal(false)}><section className="modal sales-modal" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setModal(false)}>x</button><span className="eyebrow">NUEVA OPERACION</span><h2>Registrar venta</h2><form onSubmit={handleSaveSale}>
@@ -1197,7 +1210,7 @@ export default function Home() {
     {recargaModal && <div className="modal-backdrop" onMouseDown={() => setRecargaModal(false)}><section className="modal" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setRecargaModal(false)} >x</button><span className="eyebrow">ENVIO A PLANTA</span><h2>Registrar envio a recarga</h2><form onSubmit={handleSaveRecarga}>{recargaError ? <div className="form-error-message">{recargaError}</div> : null}<div className="form-grid"><label>Cantidad de envases vacios<input type="text" inputMode="numeric" value={recQtyNormal === 0 ? "" : recQtyNormal} onChange={(e)=>{
       const val = e.target.value.replace(/\D/g, "");
       setRecQtyNormal(val === "" ? 0 : Number(val));
-    }} placeholder="0" /></label><label>Costo por balon recargado (S/)<input type="text" inputMode="decimal" value={recCostoUnitario} onChange={(e)=>setRecCostoUnitario(Number(toDecimalInput(e.target.value) || 0))} required /></label><label>Total estimado de recarga<span style={{display:'block',padding:'12px 14px',border:'1px solid #cbd5e1',borderRadius:'8px',fontWeight:800,color:'#0f172a'}}>S/ {(Number(recQtyNormal || 0) * Number(recCostoUnitario || 0)).toFixed(2)}</span></label></div><div className="modal-actions"><button type="button" onClick={()=>setRecargaModal(false)}>Cancelar</button><button type="submit" className="primary" disabled={savingRecarga}>{savingRecarga ? "Enviando..." : "Registrar envio a recarga"}</button></div></form></section></div>}
+    }} placeholder="0" /></label><label>Costo por balon recargado (S/)<input type="text" inputMode="decimal" value={recCostoUnitario} onChange={(e)=>setRecCostoUnitario(toDecimalText(e.target.value))} required /></label><label>Total estimado de recarga<span style={{display:'block',padding:'12px 14px',border:'1px solid #cbd5e1',borderRadius:'8px',fontWeight:800,color:'#0f172a'}}>S/ {(Number(recQtyNormal || 0) * Number(recCostoUnitario || 0)).toFixed(2)}</span></label></div><div className="modal-actions"><button type="button" onClick={()=>setRecargaModal(false)}>Cancelar</button><button type="submit" className="primary" disabled={savingRecarga}>{savingRecarga ? "Enviando..." : "Registrar envio a recarga"}</button></div></form></section></div>}
 
     {gastoModal && <div className="modal-backdrop" onMouseDown={() => setGastoModal(false)}><section className="modal" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setGastoModal(false)}>x</button><span className="eyebrow">REGISTRO DE GASTO</span><h2>Registrar gasto diario</h2><form onSubmit={handleSaveGasto}><div className="form-grid"><label>Concepto del gasto<input type="text" placeholder="Ej. Combustible moto repartidora" value={gastoConcepto} onChange={(e)=>setGastoConcepto(e.target.value)} required /></label><label>Categoria<select value={gastoCategoria} onChange={(e)=>setGastoCategoria(e.target.value)}><option value="Combustible">Combustible</option><option value="Reparto">Reparto</option><option value="Mantenimiento">Mantenimiento</option><option value="Personal">Personal</option><option value="Otros">Otros</option></select></label><label>Monto (S/)<input type="text" inputMode="decimal" value={gastoMonto} onChange={(e)=>setGastoMonto(Number(toDecimalInput(e.target.value) || 0))} required /></label><label>Forma de pago<select value={gastoPago} onChange={(e)=>setGastoPago(e.target.value)}><option value="Efectivo">Efectivo</option><option value="Yape">Yape / Plin</option><option value="Transferencia">Transferencia</option></select></label></div><div className="modal-actions"><button type="button" onClick={()=>setGastoModal(false)}>Cancelar</button><button type="submit" className="primary" disabled={savingGasto}>{savingGasto ? "Guardando gasto..." : "Guardar gasto"}</button></div></form></section></div>}
 
@@ -1383,6 +1396,7 @@ interface ModuleViewProps {
   onRecepcionar: (id: string, tipo: string, qty: number) => void;
   sales: SaleItem[];
   allSales: SaleItem[];
+  allGastos: GastoItem[];
   inventory: InventoryItem[];
   clients: ClientItem[];
   gastos: GastoItem[];
@@ -1399,15 +1413,14 @@ interface ModuleViewProps {
   saveGalonesHoy: (galones: number) => Promise<void>;
   precioProveedorBalon: number;
   setPrecioProveedorBalon: React.Dispatch<React.SetStateAction<number>>;
-  capitalObjetivo: number;
-  setCapitalObjetivo: React.Dispatch<React.SetStateAction<number>>;
 }
 
-function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAddRecarga, onRecepcionar, sales, allSales, inventory, clients, gastos, movimientos, recargas, onSetAggregateStock, onRequestDelete, onEditVenta, galonesChofer, setGalonesChofer, saveGalonesHoy, precioProveedorBalon, setPrecioProveedorBalon, capitalObjetivo, setCapitalObjetivo }: ModuleViewProps) {
+function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAddCliente, onAddRecarga, onRecepcionar, sales, allSales, allGastos, inventory, clients, gastos, movimientos, recargas, onSetAggregateStock, onRequestDelete, onEditVenta, galonesChofer, setGalonesChofer, saveGalonesHoy, precioProveedorBalon, setPrecioProveedorBalon }: ModuleViewProps) {
   const copy: Record<View, [string,string]> = {
     Resumen: ["", ""],
     Inventario: ["Control de existencias", ""],
     Ventas: ["Registro de ventas", ""],
+    Deudas: ["Control de deudas", ""],
     Recargas: ["Control de recargas", ""],
     Movimientos: ["Movimientos de inventario", ""],
     Clientes: ["Directorio de clientes", ""],
@@ -1422,8 +1435,9 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
   const totalDigital = sales.filter(s => s.forma_pago !== "Efectivo").reduce((a, b) => a + getSaleDebtInfo(b).charged, 0);
   const totalYape = sales.filter(s => s.forma_pago === "Yape").reduce((a, b) => a + getSaleDebtInfo(b).charged, 0);
   const totalTransferencia = sales.filter(s => s.forma_pago === "Transferencia").reduce((a, b) => a + getSaleDebtInfo(b).charged, 0);
-  const totalCredito = sales.filter(s => s.forma_pago === "Credito" || s.forma_pago === "Crédito").reduce((a, b) => a + getSaleDebtInfo(b).charged, 0);
-  const totalPorDefinir = sales.filter(s => s.forma_pago === "Por definir").reduce((a, b) => a + getSaleDebtInfo(b).charged, 0);
+  const totalCreditoPendiente = sales
+    .filter(s => s.forma_pago === "Credito" || s.forma_pago === "Crédito" || s.forma_pago === "Por definir" || s.estado === "pendiente")
+    .reduce((a, b) => a + getSaleDebtInfo(b).moneyDebt, 0);
 
   const modSalesDeudorasPago = sales.filter(s => getSaleDebtInfo(s).moneyDebt > 0);
   const modVentasDeudorasSoles = modSalesDeudorasPago.reduce((acc, curr) => acc + getSaleDebtInfo(curr).moneyDebt, 0);
@@ -1431,34 +1445,30 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
   const modVentasDeudorasBalones = modSalesDeudorasBalon.reduce((acc, curr) => acc + getSaleDebtInfo(curr).cylinderDebt, 0);
   const modSalesDeudorasTotales = sales.filter(s => getSaleDebtInfo(s).hasDebt);
   const modTotalDeudorasCount = modSalesDeudorasTotales.length;
+  const selectedYear = Number(selectedDate.slice(0, 4)) || new Date().getFullYear();
+  const allSalesDeudorasTotales = allSales.filter(s => getSaleDebtInfo(s).hasDebt);
+  const allSalesDeudorasYear = allSalesDeudorasTotales.filter((sale) => {
+    const key = rowDateKey(sale.fecha);
+    return key ? Number(key.slice(0, 4)) === selectedYear : true;
+  });
+  const yearVentasDeudorasSoles = allSalesDeudorasYear.reduce((acc, curr) => acc + getSaleDebtInfo(curr).moneyDebt, 0);
+  const yearVentasDeudorasBalones = allSalesDeudorasYear.reduce((acc, curr) => acc + getSaleDebtInfo(curr).cylinderDebt, 0);
+  const yearTotalDeudorasCount = allSalesDeudorasYear.length;
   const moduleCostoBaseBalon = Number(precioProveedorBalon || 0);
   const moduleGalonesLlenos = inventory.filter(i => i.estado === "lleno").reduce((a, b) => a + b.cantidad, 0);
   const moduleGalonesVacios = inventory.filter(i => i.estado === "vac\u00edo").reduce((a, b) => a + b.cantidad, 0);
-  const [draftGalonesLlenos, setDraftGalonesLlenos] = useState(moduleGalonesLlenos);
   const [draftGalonesVacios, setDraftGalonesVacios] = useState(moduleGalonesVacios);
   const [driveBackupState, setDriveBackupState] = useState<"idle" | "connecting" | "saving" | "success" | "error">("idle");
   const [driveBackupMessage, setDriveBackupMessage] = useState("");
 
   useEffect(() => {
     queueMicrotask(() => {
-      setDraftGalonesLlenos(moduleGalonesLlenos);
       setDraftGalonesVacios(moduleGalonesVacios);
     });
-  }, [moduleGalonesLlenos, moduleGalonesVacios]);
+  }, [moduleGalonesVacios]);
 
-  const llenoDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const vacioDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const choferDebounceRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleLlenosInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/\D/g, "");
-    const num = val === "" ? 0 : Number(val);
-    setDraftGalonesLlenos(num);
-    if (llenoDebounceRef.current) clearTimeout(llenoDebounceRef.current);
-    llenoDebounceRef.current = setTimeout(() => {
-      onSetAggregateStock("lleno", num);
-    }, 400);
-  };
 
   const handleVaciosInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, "");
@@ -1529,6 +1539,22 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
     setCapitalDisponibleRecarga(num);
     try {
       localStorage.setItem("vanigas:capital_disponible", String(num));
+    } catch {}
+  };
+
+  const [totalGalonesEmpresa, setTotalGalonesEmpresa] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    const saved = localStorage.getItem("vanigas:total_galones_empresa");
+    const num = Number(saved);
+    return Number.isFinite(num) && num >= 0 ? num : 0;
+  });
+
+  const handleTotalGalonesEmpresaInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, "");
+    const num = val === "" ? 0 : Number(val);
+    setTotalGalonesEmpresa(num);
+    try {
+      localStorage.setItem("vanigas:total_galones_empresa", String(num));
     } catch {}
   };
 
@@ -1722,20 +1748,18 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
   const moduleBalonesEnCarro = Number(galonesChofer || 0);
   const moduleBalonesPendientes = modVentasDeudorasBalones;
   const moduleTotalBalones = moduleBalonesLlenos + moduleBalonesVacios + moduleBalonesEnCarro;
-  const moduleTotalControlado = moduleTotalBalones + moduleBalonesPendientes;
+  const totalGalonesBase = totalGalonesEmpresa > 0 ? totalGalonesEmpresa : moduleTotalBalones + moduleBalonesPendientes;
+  const moduleTotalControlado = totalGalonesBase;
+  const galonesSinDetalle = Math.max(0, totalGalonesBase - moduleBalonesVacios - moduleBalonesEnCarro - moduleBalonesPendientes);
 
-  const inversionActualGas = moduleBalonesLlenos * moduleCostoBaseBalon;
   const presupuestoRecarga = moduleBalonesVacios * moduleCostoBaseBalon;
   const capitalDisponibleNum = Number(capitalDisponibleRecarga || 0);
   const montoFaltante = Math.max(0, presupuestoRecarga - capitalDisponibleNum);
   const capacidadRecargaCount = Math.min(moduleBalonesVacios, Math.floor(capitalDisponibleNum / (moduleCostoBaseBalon || 1)));
   const pendientesBalonesRecarga = Math.max(0, moduleBalonesVacios - capacidadRecargaCount);
-  const capitalActualControlado = moduleTotalControlado * moduleCostoBaseBalon;
-  const capitalObjetivoNum = Number(capitalObjetivo || 0);
-  const capitalFaltanteObjetivo = Math.max(0, capitalObjetivoNum - capitalActualControlado);
-  const balonesFaltantesObjetivo = moduleCostoBaseBalon > 0 ? Math.ceil(capitalFaltanteObjetivo / moduleCostoBaseBalon) : 0;
   const vendidosHoyInventario = sales.reduce((a, b) => a + (b.cantidad || b.qty || 0), 0);
-  const restanCarroHoy = Math.max(0, moduleBalonesEnCarro - vendidosHoyInventario);
+  const restanCarroHoy = moduleBalonesEnCarro;
+  const cargaInicialCarroHoy = moduleBalonesEnCarro + vendidosHoyInventario;
   const ventasHistoricas = allSales.length > 0 ? allSales : sales;
   const ahoraInventario = new Date();
   const getSaleDate = (sale: SaleItem) => {
@@ -1759,28 +1783,50 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
   const promedioDiario7 = balonesVendidos7 / 7;
   const promedioDiario30 = balonesVendidos30 / 30;
   const demandaReferencia = Math.max(promedioDiario7, promedioDiario30);
-  const stockRecomendado7Dias = Math.ceil(demandaReferencia * 7);
-  const compraSugeridaBalones = Math.max(0, stockRecomendado7Dias - moduleBalonesLlenos);
-  const inversionSugerida = compraSugeridaBalones * moduleCostoBaseBalon;
-
-  const handleCapitalObjetivoInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/[^0-9.]/g, "");
-    const num = val === "" || val === "." ? 0 : Number(val);
-    setCapitalObjetivo(Number.isFinite(num) ? num : 0);
-  };
+  const stockRecomendado2Dias = Math.ceil(demandaReferencia * 2);
+  const necesidadPorVentas = Math.max(0, stockRecomendado2Dias - restanCarroHoy);
+  const recargaSugeridaBalones = Math.min(moduleBalonesVacios, capacidadRecargaCount, necesidadPorVentas > 0 ? necesidadPorVentas : capacidadRecargaCount);
+  const inversionSugerida = recargaSugeridaBalones * moduleCostoBaseBalon;
 
   function handleExportExcel() {
-    if (view === "Ventas") {
-      exportToCSV("Ventas_VANIGAS.csv", sales.map(s => ({
+    const saleRows = (rows: SaleItem[]) => rows.map(s => {
+      const deuda = getSaleDebtInfo(s);
+      return {
+        "Fecha": rowDateKey(s.fecha) || "",
         "Venta ID": s.id || s.$id,
-        "Hora": s.time || "Ahora",
         "Cliente": s.client || s.cliente_nombre,
-        "Tipo Balon": s.tipo_balon || s.type,
+        "Distrito": s.distrito || "",
+        "Balon": s.tipo_balon || s.type,
         "Cantidad": s.cantidad || s.qty,
-        "Precio Unitario": s.precio_unitario || s.price,
-        "Total (S/)": s.total,
-        "Forma de Pago": s.forma_pago || s.payment
-      })));
+        "Precio unitario": s.precio_unitario || s.price,
+        "Total vendido": s.total,
+        "Cobrado": deuda.charged,
+        "Por cobrar": deuda.moneyDebt,
+        "Envases prestados": deuda.cylinderDebt,
+        "Forma de pago": s.forma_pago || s.payment,
+        "Estado": getDebtLabel(s),
+        "Observaciones": s.observacion || ""
+      };
+    });
+
+    const debtRows = allSalesDeudorasYear.map(s => {
+      const deuda = getSaleDebtInfo(s);
+      return {
+        "Fecha": rowDateKey(s.fecha) || "",
+        "Cliente": s.client || s.cliente_nombre,
+        "Distrito": s.distrito || "",
+        "Total vendido": s.total,
+        "Cobrado": deuda.charged,
+        "Por cobrar": deuda.moneyDebt,
+        "Envases prestados": deuda.cylinderDebt,
+        "Forma de pago": s.forma_pago || s.payment,
+        "Estado": getDebtLabel(s),
+        "Observaciones": s.observacion || ""
+      };
+    });
+
+    if (view === "Ventas") {
+      exportToCSV("Ventas_VANIGAS.csv", saleRows(sales));
     } else if (view === "Inventario") {
       exportToCSV("Inventario_VANIGAS.csv", inventory.map(i => ({
         "Tipo de Balon": i.tipo_balon,
@@ -1788,6 +1834,8 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
         "Cantidad": i.cantidad,
         "Stock Minimo": i.stock_minimo ?? 5
       })));
+    } else if (view === "Deudas") {
+      exportToCSV(`Deudas_VANIGAS_${selectedYear}.csv`, debtRows);
     } else if (view === "Clientes") {
       exportToCSV("Clientes_VANIGAS.csv", clients.map(c => ({
         "Nombre": c.nombre,
@@ -1814,14 +1862,40 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
         "Proveedor": r.proveedor || "Planta",
         "Estado": r.estado || "enviada"
       })));
+    } else if (view === "Caja") {
+      exportToCSV(`Caja_VANIGAS_${selectedDate}.csv`, [
+        {
+          "Fecha": selectedDate,
+          "Efectivo recibido": totalEfectivo,
+          "Digital recibido": totalDigital,
+          "Gastos del dia": totalGastos,
+          "Saldo esperado": totalEfectivo - totalGastos,
+        },
+        ...gastos.map(g => ({
+          "Fecha": g.fecha || selectedDate,
+          "Efectivo recibido": "",
+          "Digital recibido": "",
+          "Gastos del dia": g.monto || 0,
+          "Saldo esperado": "",
+          "Concepto": g.concepto,
+          "Categoria": g.categoria,
+          "Forma de pago": g.forma_pago || "Efectivo",
+        }))
+      ]);
     } else {
-      exportToCSV(`Reporte_VANIGAS_${view}_2026.csv`, sales.map(s => ({
-        "Venta ID": s.id || s.$id,
-        "Cliente": s.client || s.cliente_nombre,
-        "Balon": s.tipo_balon || s.type,
-        "Cantidad": s.cantidad || s.qty,
-        "Total": s.total
-      })));
+      exportToCSV(`Reporte_VANIGAS_${selectedYear}.csv`, [
+        {
+          "Fecha de trabajo": selectedDate,
+          "Ventas registradas": sales.length,
+          "Total vendido": totalVentas,
+          "Cobrado real": totalCobrado,
+          "Por cobrar": modVentasDeudorasSoles,
+          "Envases pendientes": modVentasDeudorasBalones,
+          "Gastos": totalGastos,
+        },
+        ...saleRows(sales),
+        ...debtRows.map(row => ({ ...row, "Tipo de registro": "Deuda" })),
+      ]);
     }
   }
 
@@ -1832,10 +1906,9 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
       { label: "Ganancia Estimada", value: `S/ ${Math.max(0, totalVentas - (sales.reduce((a,b)=>a+(b.cantidad||b.qty||0),0) * Number(precioProveedorBalon || 0)) - totalGastos).toFixed(2)}` },
       { label: "Balones Vendidos", value: `${sales.reduce((a,b)=>a+(b.cantidad||b.qty||0),0)} unidades` },
     ];
-    const headers = ["Venta ID", "Hora", "Cliente", "Balon", "Cant.", "Precio", "Total (S/)", "Pago"];
+    const headers = ["Venta ID", "Cliente", "Balon", "Cant.", "Precio", "Total (S/)", "Pago"];
     const rows = sales.map(s => [
       s.id || s.$id?.slice(-6).toUpperCase() || "V-001",
-      s.time || "Ahora",
       s.client || s.cliente_nombre || "Cliente General",
       s.tipo_balon || s.type || "Normal",
       s.cantidad || s.qty || 1,
@@ -1885,7 +1958,7 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
       const res = await fetch("/api/backup-drive", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sales, inventory, gastos, recargas, clients, movimientos })
+        body: JSON.stringify({ sales, allSales, inventory, gastos, allGastos, recargas, clients, movimientos, selectedDate })
       });
 
       const data = await readJsonResponse(res);
@@ -1907,7 +1980,7 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
       <div><h2>{copy[view]?.[0] || view}</h2></div>
       <div style={{display:'flex',gap:'10px'}}>
         {view === "Caja" ? <button className="primary" style={{background:'#c74e49'}} onClick={onAddGasto}>Registrar gasto</button> : null}
-        {view === "Caja" ? <button className="primary" onClick={onCierreCaja}>Cerrar caja del dia</button> : view === "Clientes" ? <button className="primary" onClick={onAddCliente}>Registrar cliente</button> : view === "Recargas" ? <button className="primary" onClick={onAddRecarga}>Registrar envio a recarga</button> : view === "Inventario" ? <button className="primary" onClick={openNewSnapshotModal}>Nuevo registro</button> : <button className="primary" onClick={onAdd}>Nuevo registro</button>}
+        {view === "Caja" ? <button className="primary" onClick={onCierreCaja}>Cerrar caja del dia</button> : view === "Clientes" ? <button className="primary" onClick={onAddCliente}>Registrar cliente</button> : view === "Recargas" ? <button className="primary" onClick={onAddRecarga}>Registrar envio a recarga</button> : view === "Inventario" ? <button className="primary" onClick={openNewSnapshotModal}>Nuevo registro</button> : view === "Deudas" ? null : <button className="primary" onClick={onAdd}>Nuevo registro</button>}
       </div>
     </section>
 
@@ -1917,12 +1990,12 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
           <div>
             <p className="eyebrow">Control administrativo</p>
             <h3>Inventario de galones</h3>
-            <p>Registra lo que hay en almacen, lo que esta en reparto y el costo real del proveedor. Los calculos se actualizan al momento.</p>
+            <p>Controla el total de galones de la empresa, la carga del carro, los vacios disponibles y cuanto se puede recargar con el dinero actual.</p>
           </div>
           <div className="inventory-admin-total">
-            <span>Total fisico controlado</span>
-            <strong>{moduleTotalControlado}</strong>
-            <small>Almacen + carro + balones pendientes</small>
+            <span>Disponibles en total</span>
+            <strong>{galonesSinDetalle}</strong>
+            <small>{moduleTotalControlado} total - {moduleBalonesEnCarro} carro - {moduleBalonesVacios} vacios - {moduleBalonesPendientes} prestados</small>
           </div>
         </section>
 
@@ -1930,9 +2003,9 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
           <article className="inventory-control-card">
             <div className="inventory-control-media"><img src="/balon_gas.png" alt="Balon lleno" /></div>
             <div className="inventory-control-body">
-              <span>Galones llenos en almacen</span>
-              <input type="number" min="0" value={draftGalonesLlenos || ""} placeholder="0" onChange={handleLlenosInputChange} />
-              <small>Disponibles para venta o carga al carro.</small>
+              <span>Total de galones de la empresa</span>
+              <input type="number" min="0" value={totalGalonesEmpresa || ""} placeholder="0" onChange={handleTotalGalonesEmpresaInputChange} />
+              <small>La cantidad general que pertenece a VANIGAS.</small>
             </div>
           </article>
 
@@ -1941,21 +2014,21 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
             <div className="inventory-control-body">
               <span>Galones vacios en almacen</span>
               <input type="number" min="0" value={draftGalonesVacios || ""} placeholder="0" onChange={handleVaciosInputChange} />
-              <small>Pendientes para recarga o revision.</small>
+              <small>Envases listos para enviar a recarga.</small>
             </div>
           </article>
 
           <article className="inventory-control-card">
             <div className="inventory-control-media vehicle"><img src="/carro.png" alt="Carro de reparto" /></div>
             <div className="inventory-control-body">
-              <span>Galones en carro</span>
+              <span>Saldo actual en carro</span>
               <input type="number" min="0" value={galonesChofer || ""} placeholder="0" onChange={handleChoferInputChange} />
-              <small>Carga enviada al reparto del dia.</small>
+              <small>Se descuenta automaticamente cuando registra ventas.</small>
             </div>
           </article>
         </section>
 
-        <section className="inventory-admin-grid finance">
+        <section className="inventory-admin-grid finance inventory-finance-compact">
           <article className="inventory-finance-card">
             <label>Costo proveedor por galon</label>
             <div className="money-input"><span>S/</span><input type="text" inputMode="decimal" value={rawPrecioProveedor} onChange={handlePrecioProveedorInputChange} /></div>
@@ -1963,23 +2036,17 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
           </article>
 
           <article className="inventory-finance-card">
-            <label>Capital objetivo</label>
-            <div className="money-input"><span>S/</span><input type="text" inputMode="decimal" value={capitalObjetivo || ""} placeholder="0" onChange={handleCapitalObjetivoInputChange} /></div>
-            <small>Meta de capital que queremos alcanzar.</small>
-          </article>
-
-          <article className="inventory-finance-card">
-            <label>Capital disponible para recarga</label>
+            <label>Dinero disponible para recarga</label>
             <div className="money-input"><span>S/</span><input type="text" inputMode="decimal" value={rawCapitalDisponible} onChange={handleCapitalDisponibleInputChange} /></div>
-            <small>Dinero disponible hoy para convertir vacios en llenos.</small>
+            <small>Dinero que hoy se puede usar para recargar vacios.</small>
           </article>
         </section>
 
         <section className="inventory-kpi-grid">
-          <article><span>Capital actual controlado</span><strong>S/ {capitalActualControlado.toFixed(2)}</strong><small>{moduleTotalControlado} galones x S/ {moduleCostoBaseBalon.toFixed(2)}</small></article>
-          <article><span>Dinero para recargar vacios</span><strong>S/ {presupuestoRecarga.toFixed(2)}</strong><small>{moduleBalonesVacios} vacios por recargar</small></article>
-          <article><span>Capital faltante</span><strong>S/ {capitalFaltanteObjetivo.toFixed(2)}</strong><small>{balonesFaltantesObjetivo} galones para llegar al objetivo</small></article>
-          <article><span>Restan en carro hoy</span><strong>{restanCarroHoy}</strong><small>{vendidosHoyInventario} vendidos segun ventas del dia</small></article>
+          <article><span>Costo de recargar vacios</span><strong>S/ {presupuestoRecarga.toFixed(2)}</strong><small>{moduleBalonesVacios} vacios x S/ {moduleCostoBaseBalon.toFixed(2)}</small></article>
+          <article><span>Puede recargar ahora</span><strong>{capacidadRecargaCount} balones</strong><small>Segun dinero disponible</small></article>
+          <article><span>Dinero faltante</span><strong>S/ {montoFaltante.toFixed(2)}</strong><small>Para recargar todos los vacios</small></article>
+          <article><span>Saldo actual en carro</span><strong>{restanCarroHoy}</strong><small>{vendidosHoyInventario} vendidos segun ventas del dia</small></article>
         </section>
 
         <section className="inventory-admin-columns">
@@ -1989,10 +2056,11 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
               <span>Hoy</span>
             </div>
             <div className="inventory-data-list">
-              <div><span>Galones enviados al carro</span><b>{moduleBalonesEnCarro}</b></div>
+              <div><span>Carga inicial estimada</span><b>{cargaInicialCarroHoy}</b></div>
               <div><span>Galones vendidos hoy</span><b>{vendidosHoyInventario}</b></div>
-              <div><span>Galones que deberian quedar</span><b>{restanCarroHoy}</b></div>
+              <div><span>Saldo actual en carro</span><b>{restanCarroHoy}</b></div>
               <div><span>Balones pendientes de devolver</span><b>{moduleBalonesPendientes}</b></div>
+              <div><span>Galones vacios para recarga</span><b>{moduleBalonesVacios}</b></div>
             </div>
           </article>
 
@@ -2003,27 +2071,27 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
             </div>
             <div className="recommendation-box">
               <div className="recommendation-main">
-                <span>Compra recomendada</span>
-                <strong>{compraSugeridaBalones > 0 ? `${compraSugeridaBalones} galones` : "Sin compra urgente"}</strong>
+                <span>Recarga sugerida</span>
+                <strong>{recargaSugeridaBalones > 0 ? `${recargaSugeridaBalones} balones` : "Sin recarga urgente"}</strong>
               </div>
               <div className="recommendation-metrics">
                 <div><span>Ultimos 7 dias</span><b>{balonesVendidos7} vendidos</b></div>
                 <div><span>Ultimos 30 dias</span><b>{balonesVendidos30} vendidos</b></div>
-                <div><span>Stock recomendado</span><b>{stockRecomendado7Dias} llenos</b></div>
+                <div><span>Necesidad minima</span><b>{stockRecomendado2Dias} balones</b></div>
               </div>
-              <p>Promedio diario usado: <b>{demandaReferencia.toFixed(1)} galones</b>. El sistema calcula esta sugerencia con los registros guardados en la seccion de ventas.</p>
-              <p>Inversion sugerida: <b>S/ {inversionSugerida.toFixed(2)}</b>.</p>
+              <p>Promedio diario usado: <b>{demandaReferencia.toFixed(1)} galones</b>. La sugerencia usa ventas guardadas, vacios disponibles y dinero para recarga.</p>
+              <p>Importe sugerido: <b>S/ {inversionSugerida.toFixed(2)}</b>.</p>
             </div>
           </article>
         </section>
 
         <section className="inventory-admin-columns">
           <article className="inventory-panel-clean">
-            <div className="panel-clean-head"><h3>Resumen financiero</h3></div>
+            <div className="panel-clean-head"><h3>Resumen de recarga</h3></div>
             <div className="inventory-data-list">
-              <div><span>Inversion en llenos disponibles</span><b>S/ {inversionActualGas.toFixed(2)}</b></div>
-              <div><span>Recarga cubierta con capital actual</span><b>{capacidadRecargaCount} de {moduleBalonesVacios}</b></div>
-              <div><span>Balones vacios pendientes por falta de capital</span><b>{pendientesBalonesRecarga}</b></div>
+              <div><span>Vacios disponibles para recargar</span><b>{moduleBalonesVacios}</b></div>
+              <div><span>Recarga cubierta con dinero actual</span><b>{capacidadRecargaCount} de {moduleBalonesVacios}</b></div>
+              <div><span>Vacios pendientes por falta de dinero</span><b>{pendientesBalonesRecarga}</b></div>
               <div><span>Monto faltante para recargar todo</span><b>S/ {montoFaltante.toFixed(2)}</b></div>
             </div>
           </article>
@@ -2043,9 +2111,9 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
           </article>
         </section>
       </div>
-    ) : view !== "Ventas" ? (
+    ) : view !== "Ventas" && view !== "Deudas" && view !== "Caja" ? (
       <div className="module-cards" style={{gridTemplateColumns: 'minmax(0, 320px)'}}>
-        <div><span>Total registrado</span><strong>{view === "Recargas" ? `${recargas.filter(r => r.estado !== "recibida").reduce((a, b) => a + (b.cantidad_enviada || 0), 0)} balones en planta` : view === "Movimientos" ? `${movimientos.length} movimientos` : view === "Clientes" ? `${clients.length} clientes` : view === "Caja" ? `S/ ${totalEfectivo.toFixed(2)}` : view === "Reportes" ? `${sales.length} ventas procesadas` : `${inventory.reduce((a,b)=>a+b.cantidad,0)} balones`}</strong></div>
+        <div><span>{view === "Recargas" ? "Vacios disponibles" : "Total registrado"}</span><strong>{view === "Recargas" ? `${moduleBalonesVacios} envases` : view === "Movimientos" ? `${movimientos.length} movimientos` : view === "Clientes" ? `${clients.length} clientes` : view === "Reportes" ? `${sales.length} ventas procesadas` : `${inventory.reduce((a,b)=>a+b.cantidad,0)} balones`}</strong></div>
       </div>
     ) : null}
 
@@ -2070,18 +2138,23 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
               <strong className="card-amount">S/ {totalCobrado.toFixed(2)}</strong>
               <small className="card-sub">Total ventas menos deuda</small>
             </div>
+            <div className="caja-card card-cash">
+              <span>Efectivo</span>
+              <strong className="card-amount">S/ {totalEfectivo.toFixed(2)}</strong>
+              <small className="card-sub">Dinero recibido en efectivo</small>
+            </div>
             <div className="caja-card card-digital">
-              <span>Yape / Digital</span>
+              <span>Yape</span>
               <strong className="card-amount">S/ {(totalYape + totalTransferencia).toFixed(2)}</strong>
               <small className="card-sub">Yape/Plin S/ {totalYape.toFixed(2)} + Transf. S/ {totalTransferencia.toFixed(2)}</small>
             </div>
             <div className="caja-card card-credito">
-              <span>Credito / Pendiente</span>
-              <strong className="card-amount">S/ {(totalCredito + totalPorDefinir).toFixed(2)}</strong>
-              <small className="card-sub">Cobrado por credito o por definir</small>
+              <span>Credito pendiente</span>
+              <strong className="card-amount">S/ {totalCreditoPendiente.toFixed(2)}</strong>
+              <small className="card-sub">Fiado o por definir, no cobrado</small>
             </div>
             <div className={`caja-card ${modVentasDeudorasSoles > 0 ? "card-debt" : "card-neutro"}`}>
-              <span>Por cobrar</span>
+              <span>Deben</span>
               <strong className="card-amount">S/ {modVentasDeudorasSoles.toFixed(2)}</strong>
               {modVentasDeudorasSoles > 0 ? <small className="card-sub">{modSalesDeudorasPago.length} ventas pendientes de pago</small> : <small className="card-sub">Sin deudas pendientes</small>}
             </div>
@@ -2097,6 +2170,37 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
             </div>
           </div>
           <SalesTable sales={sales} onRequestDelete={onRequestDelete} onEditVenta={onEditVenta} />
+        </div>
+      ) :
+       view === "Deudas" ? (
+        <div className="debts-dashboard">
+          <div className="sales-summary-grid debts-summary-grid">
+            <div className={`caja-card ${yearVentasDeudorasSoles > 0 ? "card-debt" : "card-neutro"}`}>
+              <span>Por cobrar del anio</span>
+              <strong className="card-amount">S/ {yearVentasDeudorasSoles.toFixed(2)}</strong>
+              <small className="card-sub">Dinero pendiente de clientes</small>
+            </div>
+            <div className={`caja-card ${yearVentasDeudorasBalones > 0 ? "card-debt" : "card-neutro"}`}>
+              <span>Envases pendientes</span>
+              <strong className="card-amount">{yearVentasDeudorasBalones} balones</strong>
+              <small className="card-sub">Balones prestados o no devueltos</small>
+            </div>
+            <div className={`caja-card ${yearTotalDeudorasCount > 0 ? "card-debt" : "card-neutro"}`}>
+              <span>Ventas con deuda</span>
+              <strong className="card-amount">{yearTotalDeudorasCount}</strong>
+              <small className="card-sub">Todas las deudas del {selectedYear}</small>
+            </div>
+          </div>
+
+          <section>
+            <article className="debt-panel">
+              <div className="debt-panel-head">
+                <h4>Deudas del año {selectedYear}</h4>
+                <span>{yearTotalDeudorasCount} registros</span>
+              </div>
+              <SalesTable sales={allSalesDeudorasYear} onRequestDelete={onRequestDelete} onEditVenta={onEditVenta} showDate />
+            </article>
+          </section>
         </div>
       ) :
        view === "Clientes" ? <div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Telefono</th><th>Direccion</th><th>Tipo</th><th>Precio habitual</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{clients.length === 0 ? <tr><td colSpan={7} style={{textAlign:'center',padding:'24px',color:'#718090'}}>No hay clientes guardados aun. Agregue uno con el boton Registrar cliente.</td></tr> : clients.map((cli, i) => <tr key={cli.$id || i}><td><b>{cli.nombre}</b></td><td>{cli.telefono || "-"}</td><td>{cli.direccion || "Direccion no especificada"}</td><td><span className="pill normal">{cli.tipo_cliente}</span></td><td>S/ {(cli.precio_habitual || 52).toFixed(2)}</td><td><span className="badge">Activo</span></td><td>{cli.$id && onRequestDelete ? <button className="delete-btn" onClick={() => onRequestDelete("cliente", cli.$id!, `el cliente ${cli.nombre}`)}>Eliminar</button> : null}</td></tr>)}</tbody></table></div> :
@@ -2237,7 +2341,7 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
                     <div className="recargas-metric-card recargas-metric-card-main" style={{ minHeight: "118px", padding: "18px", border: "1px solid #94a3b8", borderRadius: "14px", background: "#ffffff", display: "flex", flexDirection: "column", justifyContent: "center", gap: "7px" }}>
                       <span style={{ color: "#64748b", fontSize: "12px", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Sugerencia de compra</span>
                       <strong style={{ display: "block", color: "#0f172a", fontSize: "25px", lineHeight: 1, fontWeight: 900 }}>
-                        {recomendacionBalones > 0 ? `${recomendacionBalones} balones` : "Sin recarga requerida"}
+                        {recomendacionBalones > 0 ? `${recomendacionBalones} balones` : "Sin recargas"}
                       </strong>
                       <small style={{ color: "#475569", fontSize: "12px", lineHeight: 1.35, fontWeight: 700 }}>
                         {recomendacionBalones > 0
@@ -2341,12 +2445,54 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
           </div>
         ) : view === "Caja" ? (
           <div className="caja-view-container">
-            <div className="caja-summary-grid">
-              <div className="caja-card"><span>Ventas en efectivo</span><strong>S/ {totalEfectivo.toFixed(2)}</strong></div>
-              <div className="caja-card"><span>Ventas digitales (Yape/Plin)</span><strong>S/ {totalDigital.toFixed(2)}</strong></div>
-              <div className="caja-card"><span>Gastos registrados</span><strong style={{color:'#c74e49'}}>S/ {totalGastos.toFixed(2)}</strong></div>
-              <div className="caja-card highlight"><span>Saldo en Caja Esperado</span><strong>S/ {(totalEfectivo - totalGastos).toFixed(2)}</strong></div>
+            <div className="section-mini-title">
+              <h4>Control diario de caja</h4>
+              <span>{selectedDate}</span>
             </div>
+            <div className="caja-summary-grid">
+              <div className="caja-card"><span>Efectivo recibido</span><strong>S/ {totalEfectivo.toFixed(2)}</strong><small>Ventas cobradas en efectivo</small></div>
+              <div className="caja-card"><span>Digital recibido</span><strong>S/ {totalDigital.toFixed(2)}</strong><small>Yape, Plin o transferencia</small></div>
+              <div className="caja-card"><span>Gastos del dia</span><strong style={{color:'#9f1d1d'}}>S/ {totalGastos.toFixed(2)}</strong><small>{gastos.length} registro(s)</small></div>
+              <div className="caja-card highlight"><span>Saldo esperado</span><strong>S/ {(totalEfectivo - totalGastos).toFixed(2)}</strong><small>Efectivo menos gastos</small></div>
+            </div>
+
+            {(() => {
+              const saldoEsperado = Math.max(0, totalEfectivo - totalGastos);
+              const chartItems = [
+                { label: "Efectivo", value: totalEfectivo },
+                { label: "Digital", value: totalDigital },
+                { label: "Gastos", value: totalGastos },
+              ];
+              const maxValue = Math.max(1, ...chartItems.map((item) => item.value));
+              return (
+                <section className="cash-daily-chart">
+                  <div className="cash-chart-header">
+                    <div>
+                      <span>Grafica diaria</span>
+                      <h4>Movimiento de caja</h4>
+                    </div>
+                    <div className="cash-balance-box">
+                      <small>Saldo esperado</small>
+                      <strong>S/ {saldoEsperado.toFixed(2)}</strong>
+                    </div>
+                  </div>
+                  <div className="cash-bar-list">
+                    {chartItems.map((item) => (
+                      <article key={item.label} className="cash-chart-item">
+                        <div className="cash-chart-row-head">
+                          <small>{item.label}</small>
+                          <strong>S/ {item.value.toFixed(2)}</strong>
+                        </div>
+                        <div className="cash-bar-track">
+                          <span style={{ width: `${item.value > 0 ? Math.max(6, (item.value / maxValue) * 100) : 0}%` }} />
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              );
+            })()}
+
             <div className="table-wrap" style={{marginTop:'20px'}}>
               <table>
                 <thead><tr><th>Concepto</th><th>Categoria</th><th>Monto</th><th>Forma de pago</th><th>Acciones</th></tr></thead>
@@ -2544,4 +2690,3 @@ function ModuleView({ view, selectedDate, onAdd, onAddGasto, onCierreCaja, onAdd
     )}
   </div>;
 }
-
